@@ -125,20 +125,23 @@ Provide a concise but thorough reasoning for your recommendation and explain why
       let takeProfit;
       
       if (isBuySignal) {
-        // For BUY: entry below current price (support retest)
-        entryLevel = Math.min(technicalAnalysis.support, currentData.currentPrice * 0.998);
-        stopLoss = technicalAnalysis.support * 0.998; // Below entry
-        takeProfit = technicalAnalysis.resistance; // Above entry
+        // For BUY: entry at support retest
+        entryLevel = technicalAnalysis.support * 1.001; // Slightly above support
+        const riskDistance = entryLevel * 0.002; // 20 pips risk (0.2%)
+        stopLoss = entryLevel - riskDistance; // Below entry
+        takeProfit = entryLevel + (riskDistance * 2); // 2:1 reward
       } else if (isSellSignal) {
-        // For SELL: entry at resistance retest (below resistance)
+        // For SELL: entry at resistance retest
         entryLevel = technicalAnalysis.resistance * 0.999; // Slightly below resistance
-        stopLoss = technicalAnalysis.resistance * 1.002; // Above resistance (and entry)
-        takeProfit = technicalAnalysis.support; // Below entry
+        const riskDistance = entryLevel * 0.002; // 20 pips risk (0.2%)
+        stopLoss = entryLevel + riskDistance; // Above entry
+        takeProfit = entryLevel - (riskDistance * 2); // 2:1 reward
       } else {
-        // Neutral: slight pullback entry
-        entryLevel = currentData.currentPrice * (Math.random() > 0.5 ? 0.999 : 1.001);
-        stopLoss = entryLevel * (Math.random() > 0.5 ? 0.995 : 1.005);
-        takeProfit = entryLevel * (Math.random() > 0.5 ? 1.01 : 0.99);
+        // Neutral: use current price with proper RR
+        entryLevel = currentData.currentPrice;
+        const riskDistance = entryLevel * 0.002;
+        stopLoss = entryLevel + (Math.random() > 0.5 ? riskDistance : -riskDistance);
+        takeProfit = entryLevel + (stopLoss > entryLevel ? -riskDistance * 2 : riskDistance * 2);
       }
       
       recommendation = {
