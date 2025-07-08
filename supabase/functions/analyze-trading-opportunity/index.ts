@@ -121,23 +121,32 @@ Provide a concise but thorough reasoning for your recommendation and explain why
       const isSellSignal = technicalAnalysis.rsi > 70 || currentData.currentPrice > technicalAnalysis.sma20;
       
       let entryLevel;
+      let stopLoss;
+      let takeProfit;
+      
       if (isBuySignal) {
         // For BUY: entry below current price (support retest)
         entryLevel = Math.min(technicalAnalysis.support, currentData.currentPrice * 0.998);
+        stopLoss = technicalAnalysis.support * 0.998; // Below entry
+        takeProfit = technicalAnalysis.resistance; // Above entry
       } else if (isSellSignal) {
-        // For SELL: entry above current price (resistance retest)  
-        entryLevel = Math.max(technicalAnalysis.resistance, currentData.currentPrice * 1.002);
+        // For SELL: entry at resistance retest (below resistance)
+        entryLevel = technicalAnalysis.resistance * 0.999; // Slightly below resistance
+        stopLoss = technicalAnalysis.resistance * 1.002; // Above resistance (and entry)
+        takeProfit = technicalAnalysis.support; // Below entry
       } else {
         // Neutral: slight pullback entry
         entryLevel = currentData.currentPrice * (Math.random() > 0.5 ? 0.999 : 1.001);
+        stopLoss = entryLevel * (Math.random() > 0.5 ? 0.995 : 1.005);
+        takeProfit = entryLevel * (Math.random() > 0.5 ? 1.01 : 0.99);
       }
       
       recommendation = {
         action: isBuySignal ? "BUY" : isSellSignal ? "SELL" : "HOLD",
         confidence: 60,
         entry: parseFloat(entryLevel.toFixed(5)),
-        stopLoss: isBuySignal ? technicalAnalysis.support : technicalAnalysis.resistance,
-        takeProfit: isBuySignal ? technicalAnalysis.resistance : technicalAnalysis.support,
+        stopLoss: parseFloat(stopLoss.toFixed(5)),
+        takeProfit: parseFloat(takeProfit.toFixed(5)),
         support: technicalAnalysis.support,
         resistance: technicalAnalysis.resistance,
         reasoning: "Analysis based on technical indicators. Entry level calculated for optimal retracement entry.",
