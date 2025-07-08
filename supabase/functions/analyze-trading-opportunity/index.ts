@@ -115,16 +115,32 @@ Provide a concise but thorough reasoning for your recommendation and explain why
     try {
       recommendation = JSON.parse(analysisText);
     } catch (parseError) {
-      // Fallback if JSON parsing fails
+      console.log('JSON parsing failed, using fallback logic');
+      // Fallback if JSON parsing fails - calculate proper entry levels
+      const isBuySignal = technicalAnalysis.rsi < 30 || currentData.currentPrice < technicalAnalysis.sma20;
+      const isSellSignal = technicalAnalysis.rsi > 70 || currentData.currentPrice > technicalAnalysis.sma20;
+      
+      let entryLevel;
+      if (isBuySignal) {
+        // For BUY: entry below current price (support retest)
+        entryLevel = Math.min(technicalAnalysis.support, currentData.currentPrice * 0.998);
+      } else if (isSellSignal) {
+        // For SELL: entry above current price (resistance retest)  
+        entryLevel = Math.max(technicalAnalysis.resistance, currentData.currentPrice * 1.002);
+      } else {
+        // Neutral: slight pullback entry
+        entryLevel = currentData.currentPrice * (Math.random() > 0.5 ? 0.999 : 1.001);
+      }
+      
       recommendation = {
-        action: technicalAnalysis.rsi > 70 ? "SELL" : technicalAnalysis.rsi < 30 ? "BUY" : "HOLD",
+        action: isBuySignal ? "BUY" : isSellSignal ? "SELL" : "HOLD",
         confidence: 60,
-        entry: currentData.currentPrice,
-        stopLoss: technicalAnalysis.support,
-        takeProfit: technicalAnalysis.resistance,
+        entry: parseFloat(entryLevel.toFixed(5)),
+        stopLoss: isBuySignal ? technicalAnalysis.support : technicalAnalysis.resistance,
+        takeProfit: isBuySignal ? technicalAnalysis.resistance : technicalAnalysis.support,
         support: technicalAnalysis.support,
         resistance: technicalAnalysis.resistance,
-        reasoning: "Analysis based on technical indicators. RSI suggests " + (technicalAnalysis.rsi > 70 ? "overbought" : technicalAnalysis.rsi < 30 ? "oversold" : "neutral") + " conditions.",
+        reasoning: "Analysis based on technical indicators. Entry level calculated for optimal retracement entry.",
         riskReward: 2.0
       };
     }
