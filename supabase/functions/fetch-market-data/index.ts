@@ -19,8 +19,10 @@ serve(async (req) => {
       throw new Error('Twelve API key not configured');
     }
 
-    // Convert forex symbol to Twelve API format
-    const apiSymbol = symbol.replace('/', '');
+    // Convert forex symbol to Twelve API format (remove slash and ensure uppercase)
+    const apiSymbol = symbol.replace('/', '').toUpperCase();
+    
+    console.log(`Fetching data for symbol: ${symbol} -> API symbol: ${apiSymbol}`);
     
     // Fetch current quote
     const quoteResponse = await fetch(
@@ -32,9 +34,10 @@ serve(async (req) => {
     }
     
     const quoteData = await quoteResponse.json();
+    console.log(`Quote API response:`, JSON.stringify(quoteData, null, 2));
     
     if (quoteData.status === 'error') {
-      throw new Error(quoteData.message || 'API returned error');
+      throw new Error(`Quote API error: ${quoteData.message || 'Unknown error'}`);
     }
 
     // Fetch 24-hour historical data (hourly intervals)
@@ -47,9 +50,10 @@ serve(async (req) => {
     }
     
     const historicalData = await historicalResponse.json();
+    console.log(`Historical API response:`, JSON.stringify(historicalData, null, 2));
     
     if (historicalData.status === 'error') {
-      throw new Error(historicalData.message || 'Historical data API returned error');
+      throw new Error(`Historical data API error: ${historicalData.message || 'Unknown error'}`);
     }
 
     // Process current market data
