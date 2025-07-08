@@ -58,15 +58,27 @@ Based on this analysis, provide a JSON response with the following structure:
   "riskReward": number
 }
 
+IMPORTANT INSTRUCTIONS FOR ENTRY LEVEL:
+- The "entry" should NOT be the current price
+- Predict a future retracement/pullback level where price is likely to retrace to before continuing the trend
+- For BUY signals: entry should be a level BELOW current price (a pullback to support, fibonacci retracement, or moving average)
+- For SELL signals: entry should be a level ABOVE current price (a retracement to resistance, fibonacci level, or moving average)
+- Base the entry on technical levels like:
+  * Fibonacci retracements (38.2%, 50%, 61.8% of recent moves)
+  * Support/resistance retests
+  * Moving average bounces
+  * Previous swing highs/lows
+
 Consider:
 1. Price action patterns and trends
-2. Support and resistance levels
+2. Support and resistance levels for future entry opportunities
 3. RSI for overbought/oversold conditions
-4. Moving average crossovers
+4. Moving average crossovers and bounces
 5. Volume analysis
 6. Risk management principles
+7. Fibonacci retracement levels for optimal entries
 
-Provide a concise but thorough reasoning for your recommendation.
+Provide a concise but thorough reasoning for your recommendation and explain why you chose that specific entry level.
 `;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

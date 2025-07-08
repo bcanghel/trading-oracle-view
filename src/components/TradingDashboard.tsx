@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchMarketData, analyzeTradingOpportunity } from "@/lib/api";
 
@@ -50,6 +50,8 @@ export function TradingDashboard() {
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [recommendation, setRecommendation] = useState<TradingRecommendation | null>(null);
   const [historicalData, setHistoricalData] = useState<any[]>([]);
+  const [showRawData, setShowRawData] = useState(false);
+  const [analysisInputData, setAnalysisInputData] = useState<any>(null);
 
   const analyzeMarket = async () => {
     if (!selectedPair) {
@@ -75,6 +77,14 @@ export function TradingDashboard() {
         data.currentData
       );
       setRecommendation(analysis.recommendation);
+
+      // Store the input data that was sent to AI
+      setAnalysisInputData({
+        symbol: selectedPair,
+        currentData: data.currentData,
+        historicalData: data.historicalData,
+        technicalAnalysis: analysis.technicalAnalysis
+      });
 
       toast({
         title: "Analysis Complete",
@@ -261,6 +271,55 @@ export function TradingDashboard() {
                 <p className="text-muted-foreground leading-relaxed">{recommendation.reasoning}</p>
               </div>
             </CardContent>
+          </Card>
+        )}
+
+        {/* Raw Analysis Data Display */}
+        {analysisInputData && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  {showRawData ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  Raw Analysis Data
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRawData(!showRawData)}
+                >
+                  {showRawData ? "Hide" : "Show"} Data
+                </Button>
+              </div>
+            </CardHeader>
+            {showRawData && (
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-semibold mb-2">Current Market Data</h4>
+                  <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+                    {JSON.stringify(analysisInputData.currentData, null, 2)}
+                  </pre>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <h4 className="font-semibold mb-2">Technical Analysis</h4>
+                  <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+                    {JSON.stringify(analysisInputData.technicalAnalysis, null, 2)}
+                  </pre>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <h4 className="font-semibold mb-2">Historical Data (Last 12 candles)</h4>
+                  <pre className="bg-muted p-3 rounded text-sm overflow-x-auto max-h-64">
+                    {JSON.stringify(analysisInputData.historicalData?.slice(-12), null, 2)}
+                  </pre>
+                </div>
+              </CardContent>
+            )}
           </Card>
         )}
       </div>
