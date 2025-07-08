@@ -17,6 +17,7 @@ serve(async (req) => {
 
     console.log(`Starting analysis for symbol: ${symbol}`);
     console.log(`API Key exists: ${!!twelveApiKey}`);
+    console.log(`Current time: ${new Date().toISOString()}`);
 
     if (!twelveApiKey) {
       throw new Error('Twelve API key not configured');
@@ -99,23 +100,51 @@ serve(async (req) => {
     };
 
     // Process historical data for analysis
-    const processedHistoricalData = historicalData.values?.map((candle: any) => ({
-      datetime: candle.datetime,
-      open: parseFloat(candle.open),
-      high: parseFloat(candle.high),
-      low: parseFloat(candle.low),
-      close: parseFloat(candle.close),
-      volume: parseFloat(candle.volume) || 0,
-    })).reverse() || []; // Reverse to get chronological order
+    const currentTime = new Date();
+    const processedHistoricalData = historicalData.values?.map((candle: any, index: number) => {
+      const candleTime = new Date(candle.datetime);
+      const timeDiff = candleTime.getTime() - currentTime.getTime();
+      const hoursDiff = timeDiff / (1000 * 60 * 60);
+      
+      // Log suspicious timestamps
+      if (hoursDiff > 1) {
+        console.log(`WARNING: Future timestamp detected at index ${index}: ${candle.datetime} (${hoursDiff.toFixed(2)} hours in future)`);
+      }
+      
+      return {
+        datetime: candle.datetime,
+        open: parseFloat(candle.open),
+        high: parseFloat(candle.high),
+        low: parseFloat(candle.low),
+        close: parseFloat(candle.close),
+        volume: parseFloat(candle.volume) || 0,
+      };
+    }).reverse() || []; // Reverse to get chronological order
+
+    // Filter out future timestamps (more than 1 hour in future)
+    const validHistoricalData = processedHistoricalData.filter((candle: any) => {
+      const candleTime = new Date(candle.datetime);
+      const timeDiff = candleTime.getTime() - currentTime.getTime();
+      const hoursDiff = timeDiff / (1000 * 60 * 60);
+      return hoursDiff <= 1; // Allow up to 1 hour in future for timezone tolerance
+    });
 
     console.log(`Processed ${processedHistoricalData.length} historical data points`);
+    console.log(`Filtered to ${validHistoricalData.length} valid data points (removing future timestamps)`);
+    console.log(`First candle: ${validHistoricalData[0]?.datetime || 'None'}`);
+    console.log(`Last candle: ${validHistoricalData[validHistoricalData.length - 1]?.datetime || 'None'}`);
     console.log(`Current data:`, JSON.stringify(currentData, null, 2));
 
     return new Response(
       JSON.stringify({
         currentData,
-        historicalData: processedHistoricalData,
+        historicalData: validHistoricalData,
         success: true,
+        metadata: {
+          totalCandles: processedHistoricalData.length,
+          validCandles: validHistoricalData.length,
+          filteredCandles: processedHistoricalData.length - validHistoricalData.length
+        }
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
