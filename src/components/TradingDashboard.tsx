@@ -313,9 +313,9 @@ export function TradingDashboard() {
                 <Separator />
                 
                 <div>
-                  <h4 className="font-semibold mb-2">Historical Data (Last 12 candles)</h4>
+                  <h4 className="font-semibold mb-2">Historical Data ({analysisInputData.historicalData?.length || 0} candles)</h4>
                   <pre className="bg-muted p-3 rounded text-sm overflow-x-auto max-h-64">
-                    {JSON.stringify(analysisInputData.historicalData?.slice(-12), null, 2)}
+                    {JSON.stringify(analysisInputData.historicalData, null, 2)}
                   </pre>
                 </div>
               </CardContent>
