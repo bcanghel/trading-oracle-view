@@ -22,55 +22,69 @@ serve(async (req) => {
       throw new Error('Twelve API key not configured');
     }
 
-    // Convert forex symbol to Twelve API format (remove slash and ensure uppercase)
-    const apiSymbol = symbol.replace('/', '').toUpperCase();
+    // For Twelve API, forex symbols should keep the slash format
+    const apiSymbol = symbol; // Keep original format like "EUR/USD"
     
-    console.log(`Converted symbol: ${symbol} -> ${apiSymbol}`);
+    console.log(`Using symbol: ${symbol} for Twelve API`);
     
-    // Build the quote URL
-    const quoteUrl = `https://api.twelvedata.com/quote?symbol=${apiSymbol}&apikey=${twelveApiKey}`;
-    console.log(`Quote URL: ${quoteUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
+    // Try different symbol formats if the first one fails
+    const symbolVariants = [
+      symbol,                    // "EUR/USD"
+      symbol.replace('/', ''),   // "EURUSD"  
+      `FX:${symbol}`,           // "FX:EUR/USD"
+      `CURRENCY:${symbol}`      // "CURRENCY:EUR/USD"
+    ];
     
-    // Fetch current quote
-    const quoteResponse = await fetch(quoteUrl);
+    // Try different symbol formats until one works
+    let quoteData = null;
+    let historicalData = null;
+    let workingSymbol = null;
     
-    console.log(`Quote response status: ${quoteResponse.status}`);
-    console.log(`Quote response ok: ${quoteResponse.ok}`);
-    
-    if (!quoteResponse.ok) {
-      const errorText = await quoteResponse.text();
-      console.log(`Quote response error text: ${errorText}`);
-      throw new Error(`Failed to fetch quote: ${quoteResponse.status} - ${errorText}`);
-    }
-    
-    const quoteData = await quoteResponse.json();
-    console.log(`Quote API response:`, JSON.stringify(quoteData, null, 2));
-    
-    if (quoteData.status === 'error') {
-      throw new Error(`Quote API error: ${quoteData.message || 'Unknown error'}`);
-    }
+    for (const testSymbol of symbolVariants) {
+      try {
+        console.log(`Trying symbol format: ${testSymbol}`);
+        
+        // Build the quote URL
+        const quoteUrl = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(testSymbol)}&apikey=${twelveApiKey}`;
+        console.log(`Quote URL: ${quoteUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
+        
+        // Fetch current quote
+        const quoteResponse = await fetch(quoteUrl);
+        
+        if (quoteResponse.ok) {
+          const testQuoteData = await quoteResponse.json();
+          console.log(`Quote API response for ${testSymbol}:`, JSON.stringify(testQuoteData, null, 2));
+          
+          if (testQuoteData.status !== 'error' && testQuoteData.close) {
+            // Success! Now try historical data with the same format
+            const historicalUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(testSymbol)}&interval=1h&outputsize=24&apikey=${twelveApiKey}`;
+            console.log(`Historical URL: ${historicalUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
 
-    // Build historical data URL
-    const historicalUrl = `https://api.twelvedata.com/time_series?symbol=${apiSymbol}&interval=1h&outputsize=24&apikey=${twelveApiKey}`;
-    console.log(`Historical URL: ${historicalUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
-
-    // Fetch 24-hour historical data (hourly intervals)
-    const historicalResponse = await fetch(historicalUrl);
-    
-    console.log(`Historical response status: ${historicalResponse.status}`);
-    console.log(`Historical response ok: ${historicalResponse.ok}`);
-    
-    if (!historicalResponse.ok) {
-      const errorText = await historicalResponse.text();
-      console.log(`Historical response error text: ${errorText}`);
-      throw new Error(`Failed to fetch historical data: ${historicalResponse.status} - ${errorText}`);
+            const historicalResponse = await fetch(historicalUrl);
+            
+            if (historicalResponse.ok) {
+              const testHistoricalData = await historicalResponse.json();
+              console.log(`Historical API response for ${testSymbol}:`, JSON.stringify(testHistoricalData, null, 2));
+              
+              if (testHistoricalData.status !== 'error' && testHistoricalData.values) {
+                // Both calls successful!
+                quoteData = testQuoteData;
+                historicalData = testHistoricalData;
+                workingSymbol = testSymbol;
+                console.log(`Successfully found data for symbol format: ${testSymbol}`);
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.log(`Symbol format ${testSymbol} failed: ${err.message}`);
+        continue;
+      }
     }
     
-    const historicalData = await historicalResponse.json();
-    console.log(`Historical API response:`, JSON.stringify(historicalData, null, 2));
-    
-    if (historicalData.status === 'error') {
-      throw new Error(`Historical data API error: ${historicalData.message || 'Unknown error'}`);
+    if (!quoteData || !historicalData) {
+      throw new Error(`Unable to fetch data for ${symbol}. Tried formats: ${symbolVariants.join(', ')}`);
     }
 
     // Process current market data
