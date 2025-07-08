@@ -57,7 +57,7 @@ serve(async (req) => {
           
           if (testQuoteData.status !== 'error' && testQuoteData.close) {
             // Success! Now try historical data with the same format
-            const historicalUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(testSymbol)}&interval=1h&outputsize=24&apikey=${twelveApiKey}`;
+            const historicalUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(testSymbol)}&interval=1h&outputsize=48&apikey=${twelveApiKey}`;
             console.log(`Historical URL: ${historicalUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
 
             const historicalResponse = await fetch(historicalUrl);
