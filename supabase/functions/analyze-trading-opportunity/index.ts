@@ -25,7 +25,7 @@ serve(async (req) => {
     
     // Create analysis prompt for OpenAI
     const analysisPrompt = `
-You are a professional forex trading analyst. Analyze the following market data for ${symbol} and provide a trading recommendation.
+Analyze the forex market data for ${symbol} and provide a trading recommendation.
 
 Current Market Data:
 - Current Price: ${currentData.currentPrice}
@@ -49,45 +49,39 @@ Trend Analysis (24h):
 - Recent Candle Patterns: ${trendAnalysis.candlePatterns}
 - Volume Trend: ${trendAnalysis.volumeTrend}
 
-Historical Data (last 24 hours):
+Historical Data (last 12 candles):
 ${historicalData.slice(-12).map((candle: any, index: number) => 
   `${index + 1}. ${candle.datetime}: O:${candle.open} H:${candle.high} L:${candle.low} C:${candle.close}`
 ).join('\n')}
 
-Based on this analysis, provide a JSON response with the following structure:
+Provide a JSON response with this EXACT structure:
 {
-  "action": "BUY" | "SELL",
-  "confidence": number (0-100),
-  "entry": number,
-  "stopLoss": number,
-  "takeProfit": number,
-  "support": number,
-  "resistance": number,
-  "reasoning": "detailed explanation of the analysis",
-  "riskReward": number
+  "action": "BUY or SELL",
+  "confidence": "integer from 10-95 based on signal strength and market conditions",
+  "entry": "number - optimal entry level (NOT current price)",
+  "stopLoss": "number - stop loss level",
+  "takeProfit": "number - take profit level",
+  "support": "number - key support level",
+  "resistance": "number - key resistance level", 
+  "reasoning": "detailed 2-3 sentence explanation",
+  "riskReward": "number - risk to reward ratio"
 }
 
-IMPORTANT INSTRUCTIONS FOR ENTRY LEVEL:
-- The "entry" should NOT be the current price
-- Predict a future retracement/pullback level where price is likely to retrace to before continuing the trend
-- For BUY signals: entry should be a level BELOW current price (a pullback to support, fibonacci retracement, or moving average)
-- For SELL signals: entry should be a level ABOVE current price (a retracement to resistance, fibonacci level, or moving average)
-- Base the entry on technical levels like:
-  * Fibonacci retracements (38.2%, 50%, 61.8% of recent moves)
-  * Support/resistance retests
-  * Moving average bounces
-  * Previous swing highs/lows
+CONFIDENCE CALCULATION GUIDELINES:
+- 85-95%: Very strong signals (multiple confluences, clear trend, low risk)
+- 70-84%: Strong signals (good technical setup, favorable conditions)
+- 55-69%: Moderate signals (some uncertainty, mixed indicators)
+- 40-54%: Weak signals (conflicting data, high uncertainty)
+- 25-39%: Very weak signals (poor setup, high risk)
+- 10-24%: Minimal signals (avoid trading)
 
-Consider:
-1. Price action patterns and trends
-2. Support and resistance levels for future entry opportunities
-3. RSI for overbought/oversold conditions
-4. Moving average crossovers and bounces
-5. Volume analysis
-6. Risk management principles
-7. Fibonacci retracement levels for optimal entries
+ENTRY LEVEL RULES:
+- For BUY: entry should be BELOW current price (pullback to support/MA)
+- For SELL: entry should be ABOVE current price (retracement to resistance)
+- Base on fibonacci retracements, support/resistance retests, or moving average bounces
+- Do NOT use current market price as entry
 
-Provide a concise but thorough reasoning for your recommendation and explain why you chose that specific entry level.
+Consider: RSI levels, moving average positions, support/resistance strength, trend alignment, volume confirmation, and overall market structure.
 `;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -97,19 +91,20 @@ Provide a concise but thorough reasoning for your recommendation and explain why
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert forex trading analyst. Always respond with valid JSON format containing trading recommendations.'
+            content: 'You are an expert forex trading analyst. You must respond with ONLY valid JSON format containing trading recommendations. No explanatory text before or after the JSON. Start your response with { and end with }.'
           },
           {
             role: 'user',
             content: analysisPrompt
           }
         ],
-        temperature: 0.3,
-        max_tokens: 1000,
+        temperature: 0.2,
+        max_tokens: 1500,
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -120,12 +115,28 @@ Provide a concise but thorough reasoning for your recommendation and explain why
     const aiResponse = await response.json();
     const analysisText = aiResponse.choices[0].message.content;
     
+    console.log('AI Response Text:', analysisText);
+    
     let recommendation;
     try {
-      recommendation = JSON.parse(analysisText);
+      // Clean the response text to ensure it's valid JSON
+      const cleanedText = analysisText.trim();
+      recommendation = JSON.parse(cleanedText);
+      
+      // Validate the recommendation has required fields
+      if (!recommendation.action || !recommendation.confidence || !recommendation.entry) {
+        throw new Error('Missing required fields in AI response');
+      }
+      
+      console.log('Successfully parsed AI recommendation:', recommendation);
+      
     } catch (parseError) {
-      console.log('JSON parsing failed, using fallback logic');
-      // Fallback if JSON parsing fails - calculate proper entry levels
+      console.log('JSON parsing failed:', parseError.message);
+      console.log('Raw AI Response:', analysisText);
+      
+      // Enhanced fallback with more dynamic confidence calculation
+      const dynamicConfidence = calculateDynamicConfidence(technicalAnalysis, trendAnalysis, currentData);
+      
       const isBuySignal = technicalAnalysis.rsi < 30 || currentData.currentPrice < technicalAnalysis.sma20;
       const isSellSignal = technicalAnalysis.rsi > 70 || currentData.currentPrice > technicalAnalysis.sma20;
       
@@ -154,16 +165,18 @@ Provide a concise but thorough reasoning for your recommendation and explain why
       }
       
       recommendation = {
-        action: isBuySignal ? "BUY" : isSellSignal ? "SELL" : "HOLD",
-        confidence: 60,
+        action: isBuySignal ? "BUY" : isSellSignal ? "SELL" : "BUY",
+        confidence: dynamicConfidence,
         entry: parseFloat(entryLevel.toFixed(5)),
         stopLoss: parseFloat(stopLoss.toFixed(5)),
         takeProfit: parseFloat(takeProfit.toFixed(5)),
         support: technicalAnalysis.support,
         resistance: technicalAnalysis.resistance,
-        reasoning: "Analysis based on technical indicators. Entry level calculated for optimal retracement entry.",
+        reasoning: `Technical analysis fallback: ${trendAnalysis.overallTrend} trend with ${technicalAnalysis.rsi.toFixed(1)} RSI. Entry calculated for optimal retracement.`,
         riskReward: 2.0
       };
+      
+      console.log('Using fallback recommendation with dynamic confidence:', recommendation);
     }
 
     return new Response(
@@ -190,6 +203,66 @@ Provide a concise but thorough reasoning for your recommendation and explain why
     );
   }
 });
+
+// Calculate dynamic confidence based on technical indicators
+function calculateDynamicConfidence(technicalAnalysis: any, trendAnalysis: any, currentData: any): number {
+  let confidence = 50; // Base confidence
+  
+  // RSI factor (stronger signals at extremes)
+  if (technicalAnalysis.rsi < 20 || technicalAnalysis.rsi > 80) {
+    confidence += 15; // Very oversold/overbought
+  } else if (technicalAnalysis.rsi < 30 || technicalAnalysis.rsi > 70) {
+    confidence += 10; // Oversold/overbought
+  } else if (technicalAnalysis.rsi > 45 && technicalAnalysis.rsi < 55) {
+    confidence -= 5; // Neutral territory
+  }
+  
+  // Trend strength factor
+  if (trendAnalysis.trendStrength === 'STRONG') {
+    confidence += 12;
+  } else if (trendAnalysis.trendStrength === 'MODERATE') {
+    confidence += 6;
+  } else {
+    confidence -= 3;
+  }
+  
+  // Moving average alignment
+  if (technicalAnalysis.sma10 > technicalAnalysis.sma20) {
+    if (currentData.currentPrice > technicalAnalysis.sma10) {
+      confidence += 8; // Bullish alignment
+    }
+  } else {
+    if (currentData.currentPrice < technicalAnalysis.sma10) {
+      confidence += 8; // Bearish alignment
+    }
+  }
+  
+  // Higher highs and lows confirmation
+  if (trendAnalysis.higherHighs && trendAnalysis.higherLows) {
+    confidence += 10; // Strong bullish structure
+  } else if (!trendAnalysis.higherHighs && !trendAnalysis.higherLows) {
+    confidence += 5; // Bearish structure
+  }
+  
+  // Volume confirmation
+  if (trendAnalysis.volumeTrend === 'INCREASING') {
+    confidence += 5;
+  } else if (trendAnalysis.volumeTrend === 'DECREASING') {
+    confidence -= 3;
+  }
+  
+  // Candlestick patterns
+  if (trendAnalysis.candlePatterns.includes('Soldiers') || trendAnalysis.candlePatterns.includes('Crows')) {
+    confidence += 8; // Strong reversal patterns
+  } else if (trendAnalysis.candlePatterns.includes('momentum')) {
+    confidence += 4; // Momentum patterns
+  }
+  
+  // Ensure confidence stays within reasonable bounds
+  confidence = Math.max(25, Math.min(85, confidence));
+  
+  return Math.round(confidence);
+}
 
 function calculateTechnicalIndicators(data: any[]) {
   if (!data || data.length < 20) {
