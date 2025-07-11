@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertTriangle, Eye, EyeOff, History, Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertTriangle, Eye, EyeOff, History, Trash2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchMarketData, analyzeTradingOpportunity } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import UserMenu from "@/components/UserMenu";
+import { MarketSessions } from "@/components/MarketSessions";
 
 interface TradingRecommendation {
   action: 'BUY' | 'SELL';
@@ -281,49 +283,63 @@ export function TradingDashboard() {
           </div>
         </div>
 
-        {/* Trading Controls */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="analysis" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="analysis" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
               Market Analysis
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-4 items-end">
-              <div className="flex-1 max-w-xs">
-                <label className="text-sm font-medium mb-2 block">Currency Pair</label>
-                <Select value={selectedPair} onValueChange={setSelectedPair}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a pair" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FOREX_PAIRS.map((pair) => (
-                      <SelectItem key={pair.value} value={pair.value}>
-                        {pair.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button 
-                onClick={analyzeMarket} 
-                disabled={!selectedPair || isAnalyzing}
-                className="min-w-[140px]"
-              >
-                {isAnalyzing ? "Analyzing..." : "Analyze Market"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowSavedAnalyses(!showSavedAnalyses)}
-                className="min-w-[140px]"
-              >
-                <History className="h-4 w-4 mr-2" />
-                {showSavedAnalyses ? "Hide" : "Show"} History
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </TabsTrigger>
+            <TabsTrigger value="sessions" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Market Sessions
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="analysis" className="space-y-6">
+            {/* Trading Controls */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Market Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1 max-w-xs">
+                    <label className="text-sm font-medium mb-2 block">Currency Pair</label>
+                    <Select value={selectedPair} onValueChange={setSelectedPair}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a pair" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FOREX_PAIRS.map((pair) => (
+                          <SelectItem key={pair.value} value={pair.value}>
+                            {pair.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button 
+                    onClick={analyzeMarket} 
+                    disabled={!selectedPair || isAnalyzing}
+                    className="min-w-[140px]"
+                  >
+                    {isAnalyzing ? "Analyzing..." : "Analyze Market"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowSavedAnalyses(!showSavedAnalyses)}
+                    className="min-w-[140px]"
+                  >
+                    <History className="h-4 w-4 mr-2" />
+                    {showSavedAnalyses ? "Hide" : "Show"} History
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
         {/* Saved Analyses */}
         {showSavedAnalyses && (
@@ -617,6 +633,12 @@ export function TradingDashboard() {
             )}
           </Card>
         )}
+          </TabsContent>
+
+          <TabsContent value="sessions">
+            <MarketSessions />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
