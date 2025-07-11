@@ -9,8 +9,8 @@ export async function analyzeWithAI(
   marketSession: any,
   romaniaTime: Date
 ) {
-  // First, calculate algorithmic entry signal
-  const entrySignal = calculateEntrySignal({
+  // Calculate algorithmic suggestions as assistive information
+  const algorithmicSuggestion = calculateEntrySignal({
     currentPrice: currentData.currentPrice,
     technicalAnalysis,
     trendAnalysis,
@@ -18,87 +18,84 @@ export async function analyzeWithAI(
     atr: technicalAnalysis.atr
   });
 
-  // If algorithmic system recommends HOLD, use minimal AI for market commentary
-  if (entrySignal.action === 'HOLD') {
-    return {
-      action: 'HOLD',
-      confidence: entrySignal.confidence,
-      entry: entrySignal.entryPrice,
-      stopLoss: entrySignal.stopLoss,
-      takeProfit: entrySignal.takeProfit,
-      support: technicalAnalysis.support,
-      resistance: technicalAnalysis.resistance,
-      reasoning: `Algorithmic analysis: ${entrySignal.reasoning.join('. ')}.`,
-      riskReward: entrySignal.riskRewardRatio,
-      entryConditions: 'Wait for clearer market structure and stronger technical confluence',
-      entryTiming: `Current session: ${marketSession.name} - ${marketSession.status}`,
-      volumeConfirmation: 'No specific volume requirements for hold position',
-      candlestickSignals: 'Monitor for trend continuation or reversal patterns',
-      strategy: entrySignal.strategy,
-      positionSize: entrySignal.positionSize
-    };
-  }
-
-  // For BUY/SELL signals, use AI for enhanced context and refinement
   const openAIApiKey = Deno.env.get('OPEN_AI_API');
 
   if (!openAIApiKey) {
     throw new Error('OpenAI API key not configured');
   }
 
-  // Create enhanced analysis prompt with algorithmic foundation
+  // Create enhanced analysis prompt with algorithmic assistance
   const analysisPrompt = `
-You are providing REFINEMENT ONLY to a pre-calculated algorithmic trading signal. 
+Analyze the forex market data for ${symbol} and provide your trading recommendation. Use the algorithmic calculations as assistive information to inform your decision.
 
-ALGORITHMIC FOUNDATION (DO NOT OVERRIDE):
-- Strategy: ${entrySignal.strategy}
-- Action: ${entrySignal.action}
-- Entry Price: ${entrySignal.entryPrice}
-- Stop Loss: ${entrySignal.stopLoss}
-- Take Profit: ${entrySignal.takeProfit}
-- Risk/Reward: ${entrySignal.riskRewardRatio}
-- Algorithmic Confidence: ${entrySignal.confidence}%
-- Reasoning: ${entrySignal.reasoning.join('. ')}
+ALGORITHMIC ASSISTANCE (for reference):
+- Suggested Strategy: ${algorithmicSuggestion.strategy}
+- Suggested Action: ${algorithmicSuggestion.action}
+- Calculated Entry: ${algorithmicSuggestion.entryPrice}
+- Calculated Stop Loss: ${algorithmicSuggestion.stopLoss}
+- Calculated Take Profit: ${algorithmicSuggestion.takeProfit}
+- Risk/Reward Ratio: ${algorithmicSuggestion.riskRewardRatio}
+- Algorithmic Confidence: ${algorithmicSuggestion.confidence}%
+- Algorithmic Reasoning: ${algorithmicSuggestion.reasoning.join('. ')}
 
-MARKET CONTEXT:
+COMPREHENSIVE MARKET DATA:
 - Symbol: ${symbol}
 - Current Price: ${currentData.currentPrice}
-- ATR: ${technicalAnalysis.atr}
-- RSI: ${technicalAnalysis.rsi}
-- Support: ${technicalAnalysis.support}
-- Resistance: ${technicalAnalysis.resistance}
-- Session: ${marketSession.name} (${marketSession.status})
+- 24h Change: ${currentData.changePercent}%
+- 24h High: ${currentData.high24h}
+- 24h Low: ${currentData.low24h}
 
-ENHANCED TECHNICAL DATA:
-- MACD: ${technicalAnalysis.macd?.macd || 0}
-- Bollinger Bands: ${technicalAnalysis.bollinger?.upper || 0}/${technicalAnalysis.bollinger?.lower || 0}
+ENHANCED TECHNICAL ANALYSIS:
+- SMA(10): ${technicalAnalysis.sma10}
+- SMA(20): ${technicalAnalysis.sma20}
+- RSI: ${technicalAnalysis.rsi}
+- ATR: ${technicalAnalysis.atr}
+- MACD: ${technicalAnalysis.macd?.macd || 0} (Signal: ${technicalAnalysis.macd?.signal || 0})
+- Bollinger Bands: Upper=${technicalAnalysis.bollinger?.upper || 0}, Lower=${technicalAnalysis.bollinger?.lower || 0}
+- Support Level: ${technicalAnalysis.support}
+- Resistance Level: ${technicalAnalysis.resistance}
 - Pivot Points: R1=${technicalAnalysis.pivotPoints?.r1 || 0}, S1=${technicalAnalysis.pivotPoints?.s1 || 0}
 - Fibonacci Levels: 38.2%=${technicalAnalysis.fibonacci?.level382 || 0}, 61.8%=${technicalAnalysis.fibonacci?.level618 || 0}
+- Swing Levels: High=${technicalAnalysis.swingLevels?.swingHigh || 0}, Low=${technicalAnalysis.swingLevels?.swingLow || 0}
 
-YOUR TASK: Provide ONLY tactical refinements to the algorithmic signal. 
+TREND ANALYSIS:
+- Overall Trend: ${trendAnalysis.overallTrend}
+- Trend Strength: ${trendAnalysis.trendStrength}
+- Price Momentum: ${trendAnalysis.momentum}
+- Higher Highs/Lows: ${trendAnalysis.higherHighs ? 'Yes' : 'No'} / ${trendAnalysis.higherLows ? 'Yes' : 'No'}
+- Candle Patterns: ${trendAnalysis.candlePatterns}
+- Volume Trend: ${trendAnalysis.volumeTrend}
 
-Return JSON with this EXACT structure:
+MARKET SESSION:
+- Current Romania Time: ${romaniaTime.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' })}
+- Active Session: ${marketSession.name}
+- Session Status: ${marketSession.status}
+- Volatility Level: ${marketSession.volatility}
+- Session Recommendation: ${marketSession.recommendation}
+
+Provide a JSON response with this EXACT structure:
 {
-  "action": "${entrySignal.action}",
-  "confidence": ${entrySignal.confidence},
-  "entry": ${entrySignal.entryPrice},
-  "stopLoss": ${entrySignal.stopLoss},
-  "takeProfit": ${entrySignal.takeProfit},
-  "support": ${technicalAnalysis.support},
-  "resistance": ${technicalAnalysis.resistance},
-  "reasoning": "string - Brief refinement of algorithmic reasoning with market context",
-  "riskReward": ${entrySignal.riskRewardRatio},
-  "entryConditions": "string - Specific entry trigger refinements",
-  "entryTiming": "string - Session timing considerations",
-  "volumeConfirmation": "string - Volume confirmation requirements",
-  "candlestickSignals": "string - Candlestick pattern confirmations"
+  "action": "BUY, SELL, or HOLD",
+  "confidence": "integer from 10-95 based on your analysis",
+  "entry": "number - your optimal entry level",
+  "stopLoss": "number - your stop loss level",
+  "takeProfit": "number - your take profit level",
+  "support": "number - key support level you identify",
+  "resistance": "number - key resistance level you identify", 
+  "reasoning": "detailed explanation of your decision",
+  "riskReward": "number - your calculated risk to reward ratio",
+  "entryConditions": "string - specific trigger conditions for entry",
+  "entryTiming": "string - timing guidance and session considerations",
+  "volumeConfirmation": "string - volume requirements for entry",
+  "candlestickSignals": "string - candlestick confirmation patterns to watch for"
 }
 
-CRITICAL RULES:
-- DO NOT change action, entry, stopLoss, takeProfit, or confidence values
-- Only provide tactical refinements to entry conditions and timing
-- Keep reasoning concise and focused on market structure
-- Base all refinements on the provided technical data`;
+DECISION GUIDELINES:
+- You can agree or disagree with the algorithmic suggestion based on your analysis
+- Use the enhanced technical data to make informed decisions
+- Consider market context, session timing, and overall market structure
+- Provide clear reasoning for your recommendations
+- Base confidence on the strength of your analysis and market conditions`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -118,7 +115,7 @@ CRITICAL RULES:
           content: analysisPrompt
         }
       ],
-      temperature: 0.0,
+      temperature: 0.1,
       max_tokens: 1500,
       response_format: { type: "json_object" },
     }),
@@ -143,9 +140,9 @@ CRITICAL RULES:
       throw new Error('Missing required fields in AI response');
     }
     
-    // Add algorithmic data to AI response
-    recommendation.strategy = entrySignal.strategy;
-    recommendation.positionSize = entrySignal.positionSize;
+    // Add algorithmic data to AI response for reference
+    recommendation.algorithmicStrategy = algorithmicSuggestion.strategy;
+    recommendation.algorithmicPositionSize = algorithmicSuggestion.positionSize;
     
     console.log('Successfully parsed AI recommendation:', recommendation);
     return recommendation;
