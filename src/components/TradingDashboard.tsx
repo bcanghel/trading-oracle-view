@@ -201,6 +201,20 @@ export function TradingDashboard() {
 
   const deleteAnalysis = async (id: string) => {
     try {
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log("No user authenticated, cannot delete");
+        toast({
+          title: "Error",
+          description: "You must be logged in to delete analyses",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("Attempting to delete analysis:", id, "for user:", user.id);
+      
       const { error } = await supabase
         .from('trade_analyses')
         .delete()
@@ -210,10 +224,11 @@ export function TradingDashboard() {
         console.error("Error deleting analysis:", error);
         toast({
           title: "Error",
-          description: "Failed to delete analysis",
+          description: `Failed to delete analysis: ${error.message}`,
           variant: "destructive",
         });
       } else {
+        console.log("Analysis deleted successfully");
         toast({
           title: "Deleted",
           description: "Analysis deleted successfully",
@@ -222,6 +237,11 @@ export function TradingDashboard() {
       }
     } catch (error) {
       console.error("Error deleting analysis:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while deleting the analysis",
+        variant: "destructive",
+      });
     }
   };
 
