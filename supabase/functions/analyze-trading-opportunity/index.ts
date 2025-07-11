@@ -131,52 +131,21 @@ Consider: RSI levels, moving average positions, support/resistance strength, tre
       console.log('Successfully parsed AI recommendation:', recommendation);
       
     } catch (parseError) {
-      console.log('JSON parsing failed:', parseError.message);
+      console.log('AI analysis failed:', parseError.message);
       console.log('Raw AI Response:', analysisText);
       
-      // Enhanced fallback with more dynamic confidence calculation
-      const dynamicConfidence = calculateDynamicConfidence(technicalAnalysis, trendAnalysis, currentData);
-      
-      const isBuySignal = technicalAnalysis.rsi < 30 || currentData.currentPrice < technicalAnalysis.sma20;
-      const isSellSignal = technicalAnalysis.rsi > 70 || currentData.currentPrice > technicalAnalysis.sma20;
-      
-      let entryLevel;
-      let stopLoss;
-      let takeProfit;
-      
-      if (isBuySignal) {
-        // For BUY: entry at support retest
-        entryLevel = technicalAnalysis.support * 1.001; // Slightly above support
-        const riskDistance = entryLevel * 0.002; // 20 pips risk (0.2%)
-        stopLoss = entryLevel - riskDistance; // Below entry
-        takeProfit = entryLevel + (riskDistance * 2); // 2:1 reward
-      } else if (isSellSignal) {
-        // For SELL: entry at resistance retest
-        entryLevel = technicalAnalysis.resistance * 0.999; // Slightly below resistance
-        const riskDistance = entryLevel * 0.002; // 20 pips risk (0.2%)
-        stopLoss = entryLevel + riskDistance; // Above entry
-        takeProfit = entryLevel - (riskDistance * 2); // 2:1 reward
-      } else {
-        // Neutral: use current price with proper RR
-        entryLevel = currentData.currentPrice;
-        const riskDistance = entryLevel * 0.002;
-        stopLoss = entryLevel + (Math.random() > 0.5 ? riskDistance : -riskDistance);
-        takeProfit = entryLevel + (stopLoss > entryLevel ? -riskDistance * 2 : riskDistance * 2);
-      }
-      
-      recommendation = {
-        action: isBuySignal ? "BUY" : isSellSignal ? "SELL" : "BUY",
-        confidence: dynamicConfidence,
-        entry: parseFloat(entryLevel.toFixed(5)),
-        stopLoss: parseFloat(stopLoss.toFixed(5)),
-        takeProfit: parseFloat(takeProfit.toFixed(5)),
-        support: technicalAnalysis.support,
-        resistance: technicalAnalysis.resistance,
-        reasoning: `Technical analysis fallback: ${trendAnalysis.overallTrend} trend with ${technicalAnalysis.rsi.toFixed(1)} RSI. Entry calculated for optimal retracement.`,
-        riskReward: 2.0
-      };
-      
-      console.log('Using fallback recommendation with dynamic confidence:', recommendation);
+      // Return error instead of fallback
+      return new Response(
+        JSON.stringify({
+          error: 'AI analysis unavailable. Please try again.',
+          aiError: true,
+          success: false,
+        }),
+        {
+          status: 422, // Unprocessable Entity
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     return new Response(
@@ -203,66 +172,6 @@ Consider: RSI levels, moving average positions, support/resistance strength, tre
     );
   }
 });
-
-// Calculate dynamic confidence based on technical indicators
-function calculateDynamicConfidence(technicalAnalysis: any, trendAnalysis: any, currentData: any): number {
-  let confidence = 50; // Base confidence
-  
-  // RSI factor (stronger signals at extremes)
-  if (technicalAnalysis.rsi < 20 || technicalAnalysis.rsi > 80) {
-    confidence += 15; // Very oversold/overbought
-  } else if (technicalAnalysis.rsi < 30 || technicalAnalysis.rsi > 70) {
-    confidence += 10; // Oversold/overbought
-  } else if (technicalAnalysis.rsi > 45 && technicalAnalysis.rsi < 55) {
-    confidence -= 5; // Neutral territory
-  }
-  
-  // Trend strength factor
-  if (trendAnalysis.trendStrength === 'STRONG') {
-    confidence += 12;
-  } else if (trendAnalysis.trendStrength === 'MODERATE') {
-    confidence += 6;
-  } else {
-    confidence -= 3;
-  }
-  
-  // Moving average alignment
-  if (technicalAnalysis.sma10 > technicalAnalysis.sma20) {
-    if (currentData.currentPrice > technicalAnalysis.sma10) {
-      confidence += 8; // Bullish alignment
-    }
-  } else {
-    if (currentData.currentPrice < technicalAnalysis.sma10) {
-      confidence += 8; // Bearish alignment
-    }
-  }
-  
-  // Higher highs and lows confirmation
-  if (trendAnalysis.higherHighs && trendAnalysis.higherLows) {
-    confidence += 10; // Strong bullish structure
-  } else if (!trendAnalysis.higherHighs && !trendAnalysis.higherLows) {
-    confidence += 5; // Bearish structure
-  }
-  
-  // Volume confirmation
-  if (trendAnalysis.volumeTrend === 'INCREASING') {
-    confidence += 5;
-  } else if (trendAnalysis.volumeTrend === 'DECREASING') {
-    confidence -= 3;
-  }
-  
-  // Candlestick patterns
-  if (trendAnalysis.candlePatterns.includes('Soldiers') || trendAnalysis.candlePatterns.includes('Crows')) {
-    confidence += 8; // Strong reversal patterns
-  } else if (trendAnalysis.candlePatterns.includes('momentum')) {
-    confidence += 4; // Momentum patterns
-  }
-  
-  // Ensure confidence stays within reasonable bounds
-  confidence = Math.max(25, Math.min(85, confidence));
-  
-  return Math.round(confidence);
-}
 
 function calculateTechnicalIndicators(data: any[]) {
   if (!data || data.length < 20) {

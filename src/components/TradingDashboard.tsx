@@ -89,6 +89,19 @@ export function TradingDashboard() {
         data.historicalData,
         data.currentData
       );
+
+      // Check if AI analysis failed
+      if (analysis.aiError) {
+        setRecommendation(null);
+        setAnalysisInputData(null);
+        toast({
+          title: "AI Analysis Unavailable",
+          description: "AI analysis is currently unavailable. Please try again later.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setRecommendation(analysis.recommendation);
 
       // Store the input data that was sent to AI
@@ -99,20 +112,32 @@ export function TradingDashboard() {
         technicalAnalysis: analysis.technicalAnalysis
       });
 
-      // Save to Supabase
+      // Save to Supabase only if analysis succeeded
       await saveAnalysisToDatabase(data, analysis);
 
       toast({
         title: "Analysis Complete",
-        description: `Trading recommendation generated for ${selectedPair}`,
+        description: `AI trading recommendation generated for ${selectedPair}`,
       });
     } catch (error) {
       console.error("Error analyzing market:", error);
-      toast({
-        title: "Error",
-        description: "Failed to analyze market data. Please try again.",
-        variant: "destructive",
-      });
+      
+      // Check if it's an AI-specific error
+      if (error.message?.includes('AI analysis unavailable')) {
+        setRecommendation(null);
+        setAnalysisInputData(null);
+        toast({
+          title: "AI Analysis Unavailable",
+          description: "AI analysis is currently unavailable. Please try again later.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to analyze market data. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -387,7 +412,7 @@ export function TradingDashboard() {
         )}
 
         {/* Trading Recommendation */}
-        {recommendation && (
+        {recommendation ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -449,6 +474,25 @@ export function TradingDashboard() {
               <div>
                 <h4 className="font-semibold mb-2">Analysis Reasoning</h4>
                 <p className="text-muted-foreground leading-relaxed">{recommendation.reasoning}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : marketData && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+                AI Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <div className="text-muted-foreground text-lg">
+                  AI Analysis Unavailable
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  The AI trading analysis is currently unavailable. Please try analyzing again.
+                </p>
               </div>
             </CardContent>
           </Card>
