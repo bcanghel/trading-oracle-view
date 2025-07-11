@@ -1,3 +1,5 @@
+import { calculateEntrySignal } from "./entry-logic.ts";
+
 export async function analyzeWithAI(
   symbol: string,
   historicalData: any[],
@@ -7,95 +9,96 @@ export async function analyzeWithAI(
   marketSession: any,
   romaniaTime: Date
 ) {
+  // First, calculate algorithmic entry signal
+  const entrySignal = calculateEntrySignal({
+    currentPrice: currentData.currentPrice,
+    technicalAnalysis,
+    trendAnalysis,
+    marketSession,
+    atr: technicalAnalysis.atr
+  });
+
+  // If algorithmic system recommends HOLD, use minimal AI for market commentary
+  if (entrySignal.action === 'HOLD') {
+    return {
+      action: 'HOLD',
+      confidence: entrySignal.confidence,
+      entry: entrySignal.entryPrice,
+      stopLoss: entrySignal.stopLoss,
+      takeProfit: entrySignal.takeProfit,
+      support: technicalAnalysis.support,
+      resistance: technicalAnalysis.resistance,
+      reasoning: `Algorithmic analysis: ${entrySignal.reasoning.join('. ')}.`,
+      riskReward: entrySignal.riskRewardRatio,
+      entryConditions: 'Wait for clearer market structure and stronger technical confluence',
+      entryTiming: `Current session: ${marketSession.name} - ${marketSession.status}`,
+      volumeConfirmation: 'No specific volume requirements for hold position',
+      candlestickSignals: 'Monitor for trend continuation or reversal patterns',
+      strategy: entrySignal.strategy,
+      positionSize: entrySignal.positionSize
+    };
+  }
+
+  // For BUY/SELL signals, use AI for enhanced context and refinement
   const openAIApiKey = Deno.env.get('OPEN_AI_API');
 
   if (!openAIApiKey) {
     throw new Error('OpenAI API key not configured');
   }
 
-  // Create analysis prompt for OpenAI
+  // Create enhanced analysis prompt with algorithmic foundation
   const analysisPrompt = `
-Analyze the forex market data for ${symbol} and provide a trading recommendation with enhanced entry conditions and market timing.
+You are providing REFINEMENT ONLY to a pre-calculated algorithmic trading signal. 
 
-Current Market Data:
+ALGORITHMIC FOUNDATION (DO NOT OVERRIDE):
+- Strategy: ${entrySignal.strategy}
+- Action: ${entrySignal.action}
+- Entry Price: ${entrySignal.entryPrice}
+- Stop Loss: ${entrySignal.stopLoss}
+- Take Profit: ${entrySignal.takeProfit}
+- Risk/Reward: ${entrySignal.riskRewardRatio}
+- Algorithmic Confidence: ${entrySignal.confidence}%
+- Reasoning: ${entrySignal.reasoning.join('. ')}
+
+MARKET CONTEXT:
+- Symbol: ${symbol}
 - Current Price: ${currentData.currentPrice}
-- 24h Change: ${currentData.changePercent}%
-- 24h High: ${currentData.high24h}
-- 24h Low: ${currentData.low24h}
-
-Technical Analysis:
-- Current SMA(10): ${technicalAnalysis.sma10}
-- Current SMA(20): ${technicalAnalysis.sma20}
+- ATR: ${technicalAnalysis.atr}
 - RSI: ${technicalAnalysis.rsi}
-- Support Level: ${technicalAnalysis.support}
-- Resistance Level: ${technicalAnalysis.resistance}
-- Recent Price Range: ${technicalAnalysis.priceRange}
+- Support: ${technicalAnalysis.support}
+- Resistance: ${technicalAnalysis.resistance}
+- Session: ${marketSession.name} (${marketSession.status})
 
-Trend Analysis (24h):
-- Overall Trend: ${trendAnalysis.overallTrend}
-- Trend Strength: ${trendAnalysis.trendStrength}
-- Price Momentum: ${trendAnalysis.momentum}
-- Higher Highs/Lows: ${trendAnalysis.higherHighs ? 'Yes' : 'No'} / ${trendAnalysis.higherLows ? 'Yes' : 'No'}
-- Recent Candle Patterns: ${trendAnalysis.candlePatterns}
-- Volume Trend: ${trendAnalysis.volumeTrend}
+ENHANCED TECHNICAL DATA:
+- MACD: ${technicalAnalysis.macd?.macd || 0}
+- Bollinger Bands: ${technicalAnalysis.bollinger?.upper || 0}/${technicalAnalysis.bollinger?.lower || 0}
+- Pivot Points: R1=${technicalAnalysis.pivotPoints?.r1 || 0}, S1=${technicalAnalysis.pivotPoints?.s1 || 0}
+- Fibonacci Levels: 38.2%=${technicalAnalysis.fibonacci?.level382 || 0}, 61.8%=${technicalAnalysis.fibonacci?.level618 || 0}
 
-Market Session Analysis (Romania Time):
-- Current Romania Time: ${romaniaTime.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' })}
-- Active Market Session: ${marketSession.name}
-- Session Status: ${marketSession.status}
-- Volatility Level: ${marketSession.volatility}
-- Trading Recommendation: ${marketSession.recommendation}
+YOUR TASK: Provide ONLY tactical refinements to the algorithmic signal. 
 
-Historical Data (last 12 candles):
-${historicalData.slice(-12).map((candle: any, index: number) => 
-  `${index + 1}. ${candle.datetime}: O:${candle.open} H:${candle.high} L:${candle.low} C:${candle.close}`
-).join('\n')}
-
-Provide a JSON response with this EXACT structure:
+Return JSON with this EXACT structure:
 {
-  "action": "BUY or SELL",
-  "confidence": "integer from 10-95 based on signal strength and market conditions",
-  "entry": "number - optimal entry level (NOT current price)",
-  "stopLoss": "number - stop loss level",
-  "takeProfit": "number - take profit level",
-  "support": "number - key support level",
-  "resistance": "number - key resistance level", 
-  "reasoning": "detailed 2-3 sentence explanation",
-  "riskReward": "number - risk to reward ratio",
-  "entryConditions": "string - specific trigger conditions for entry",
-  "entryTiming": "string - timing guidance and session considerations",
-  "volumeConfirmation": "string - volume requirements for entry",
-  "candlestickSignals": "string - candlestick confirmation patterns to watch for"
+  "action": "${entrySignal.action}",
+  "confidence": ${entrySignal.confidence},
+  "entry": ${entrySignal.entryPrice},
+  "stopLoss": ${entrySignal.stopLoss},
+  "takeProfit": ${entrySignal.takeProfit},
+  "support": ${technicalAnalysis.support},
+  "resistance": ${technicalAnalysis.resistance},
+  "reasoning": "string - Brief refinement of algorithmic reasoning with market context",
+  "riskReward": ${entrySignal.riskRewardRatio},
+  "entryConditions": "string - Specific entry trigger refinements",
+  "entryTiming": "string - Session timing considerations",
+  "volumeConfirmation": "string - Volume confirmation requirements",
+  "candlestickSignals": "string - Candlestick pattern confirmations"
 }
 
-ENHANCED ENTRY CONDITIONS ANALYSIS:
-- Specify exact trigger conditions (e.g., "Wait for price to test 1.0850 support + bullish hammer + volume spike >150% average")
-- Include candlestick confirmation requirements (hammers, engulfing patterns, doji reversals)
-- Define volume confirmation criteria (volume spikes, above-average volume)
-- Consider moving average interactions (bounces, breaks, retests)
-
-ENTRY TIMING & MARKET SESSION GUIDANCE:
-- Consider current market session volatility and liquidity
-- High volatility sessions (London-NY overlap): More aggressive entries possible
-- Low volatility sessions (Asian): More conservative, wait for clear breakouts
-- Account for session transitions and their impact on price action
-
-CONFIDENCE CALCULATION GUIDELINES:
-- 85-95%: Very strong signals (multiple confluences, clear trend, low risk)
-- 70-84%: Strong signals (good technical setup, favorable conditions)
-- 55-69%: Moderate signals (some uncertainty, mixed indicators)
-- 40-54%: Weak signals (conflicting data, high uncertainty)
-- 25-39%: Very weak signals (poor setup, high risk)
-- 10-24%: Minimal signals (avoid trading)
-
-ENTRY LEVEL RULES:
-- For BUY: entry should be BELOW current price (pullback to support/MA)
-- For SELL: entry should be ABOVE current price (retracement to resistance)
-- Base on fibonacci retracements, support/resistance retests, or moving average bounces
-- Do NOT use current market price as entry
-
-Consider: RSI levels, moving average positions, support/resistance strength, trend alignment, volume confirmation, market session timing, and overall market structure.
-`;
+CRITICAL RULES:
+- DO NOT change action, entry, stopLoss, takeProfit, or confidence values
+- Only provide tactical refinements to entry conditions and timing
+- Keep reasoning concise and focused on market structure
+- Base all refinements on the provided technical data`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -115,7 +118,7 @@ Consider: RSI levels, moving average positions, support/resistance strength, tre
           content: analysisPrompt
         }
       ],
-      temperature: 0.2,
+      temperature: 0.0,
       max_tokens: 1500,
       response_format: { type: "json_object" },
     }),
@@ -139,6 +142,10 @@ Consider: RSI levels, moving average positions, support/resistance strength, tre
     if (!recommendation.action || !recommendation.confidence || !recommendation.entry) {
       throw new Error('Missing required fields in AI response');
     }
+    
+    // Add algorithmic data to AI response
+    recommendation.strategy = entrySignal.strategy;
+    recommendation.positionSize = entrySignal.positionSize;
     
     console.log('Successfully parsed AI recommendation:', recommendation);
     return recommendation;
