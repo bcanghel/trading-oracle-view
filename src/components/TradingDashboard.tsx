@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertTriangl
 import { useToast } from "@/hooks/use-toast";
 import { fetchMarketData, analyzeTradingOpportunity } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
+import UserMenu from "@/components/UserMenu";
 
 interface TradingRecommendation {
   action: 'BUY' | 'SELL';
@@ -222,9 +223,12 @@ export function TradingDashboard() {
             <h1 className="text-3xl font-bold text-foreground">Trading Oracle</h1>
             <p className="text-muted-foreground">AI-Powered Forex Trading Analysis</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium">Live Market Data</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">Live Market Data</span>
+            </div>
+            <UserMenu />
           </div>
         </div>
 
