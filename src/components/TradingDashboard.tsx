@@ -5,7 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertTriangle, Eye, EyeOff, History, Trash2, Clock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertTriangle, Eye, EyeOff, History, Trash2, Clock, Info, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchMarketData, analyzeTradingOpportunity } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,6 +72,85 @@ export function TradingDashboard() {
   const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
   const [showSavedAnalyses, setShowSavedAnalyses] = useState(false);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+
+  // Session helper functions
+  const getRomaniaHour = (date: Date = new Date()) => {
+    return parseInt(date.toLocaleString('en-US', {
+      timeZone: 'Europe/Bucharest',
+      hour: '2-digit',
+      hour12: false
+    }));
+  };
+
+  const getNextSession = () => {
+    const currentHour = getRomaniaHour();
+    
+    if (currentHour < 2) {
+      return { name: 'Asian Open', time: '02:00', hoursUntil: 2 - currentHour };
+    } else if (currentHour < 10) {
+      return { name: 'London Open', time: '10:00', hoursUntil: 10 - currentHour };
+    } else if (currentHour < 15) {
+      return { name: 'London-NY Overlap', time: '15:00', hoursUntil: 15 - currentHour };
+    } else if (currentHour < 19) {
+      return { name: 'London Close', time: '19:00', hoursUntil: 19 - currentHour };
+    } else {
+      return { name: 'Asian Open', time: '02:00 (Next Day)', hoursUntil: 24 - currentHour + 2 };
+    }
+  };
+
+  const getSessionStatus = () => {
+    const currentHour = getRomaniaHour();
+    
+    if ((currentHour >= 2 && currentHour < 11)) {
+      return { status: 'active', name: 'Asian Session', priority: 'low' };
+    } else if (currentHour >= 10 && currentHour < 19) {
+      return { status: 'active', name: 'London Session', priority: 'high' };
+    } else if (currentHour >= 15 && currentHour < 19) {
+      return { status: 'active', name: 'London-NY Overlap', priority: 'highest' };
+    } else if (currentHour >= 15 && currentHour < 24) {
+      return { status: 'active', name: 'New York Session', priority: 'medium' };
+    } else {
+      return { status: 'closed', name: 'Markets Closed', priority: 'none' };
+    }
+  };
+
+  const getPairSessionInfo = (symbol: string) => {
+    const currentSession = getSessionStatus();
+    const nextSession = getNextSession();
+    
+    // Check if pair is optimal for current or next session
+    const asianPairs = ['USD/JPY', 'AUD/USD', 'NZD/USD', 'AUD/JPY'];
+    const europeanPairs = ['EUR/USD', 'GBP/USD', 'EUR/GBP', 'USD/CHF'];
+    const allPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY'];
+    
+    let recommendation = '';
+    let priority = 'medium';
+    
+    if (currentSession.status === 'active') {
+      if (currentSession.name === 'London-NY Overlap' && allPairs.includes(symbol)) {
+        recommendation = `Peak liquidity active for ${symbol}`;
+        priority = 'highest';
+      } else if (currentSession.name === 'London Session' && europeanPairs.includes(symbol)) {
+        recommendation = `Optimal session active for ${symbol}`;
+        priority = 'high';
+      } else if (currentSession.name === 'Asian Session' && asianPairs.includes(symbol)) {
+        recommendation = `Good session for ${symbol} range trading`;
+        priority = 'medium';
+      }
+    }
+    
+    if (!recommendation) {
+      if (nextSession.hoursUntil <= 2) {
+        recommendation = `${nextSession.name} begins in ${nextSession.hoursUntil}h ${((nextSession.hoursUntil % 1) * 60).toFixed(0)}m`;
+        priority = 'upcoming';
+      } else {
+        recommendation = `Next optimal: ${nextSession.name}`;
+        priority = 'low';
+      }
+    }
+    
+    return { recommendation, priority, nextSession, currentSession };
+  };
 
   const analyzeMarket = async () => {
     if (!selectedPair) {
@@ -357,41 +437,126 @@ export function TradingDashboard() {
                 <p className="text-muted-foreground">No saved analyses found</p>
               ) : (
                 <div className="space-y-3">
-                  {savedAnalyses.map((analysis) => (
-                    <div
-                      key={analysis.id}
-                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline">{analysis.symbol}</Badge>
-                        <div className="text-sm">
-                          <p className="font-medium">
-                            {analysis.ai_analysis.recommendation.action} - {analysis.ai_analysis.recommendation.confidence}% confidence
-                          </p>
-                          <p className="text-muted-foreground">
-                            {new Date(analysis.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => loadAnalysis(analysis)}
-                        >
-                          Load
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => deleteAnalysis(analysis.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                   {savedAnalyses.map((analysis) => {
+                     const sessionInfo = getPairSessionInfo(analysis.symbol);
+                     return (
+                       <div
+                         key={analysis.id}
+                         className="flex items-center justify-between p-4 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+                       >
+                         <div className="flex items-center gap-4 flex-1">
+                           <Badge variant="outline" className="font-mono">{analysis.symbol}</Badge>
+                           
+                           <div className="text-sm flex-1">
+                             <p className="font-medium">
+                               {analysis.ai_analysis.recommendation.action} - {analysis.ai_analysis.recommendation.confidence}% confidence
+                             </p>
+                             <p className="text-muted-foreground">
+                               {new Date(analysis.created_at).toLocaleString()}
+                             </p>
+                           </div>
+                           
+                           {/* Session Information */}
+                           <div className="flex items-center gap-2">
+                             <Badge 
+                               variant={
+                                 sessionInfo.priority === 'highest' ? 'destructive' :
+                                 sessionInfo.priority === 'high' ? 'default' :
+                                 sessionInfo.priority === 'upcoming' ? 'secondary' :
+                                 'outline'
+                               }
+                               className="text-xs flex items-center gap-1"
+                             >
+                               <Timer className="h-3 w-3" />
+                               {sessionInfo.priority === 'upcoming' ? 'Upcoming' :
+                                sessionInfo.priority === 'highest' ? 'Peak Now' :
+                                sessionInfo.priority === 'high' ? 'Active' :
+                                sessionInfo.priority === 'medium' ? 'Good' : 'Low'}
+                             </Badge>
+                             
+                             <Dialog>
+                               <DialogTrigger asChild>
+                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                   <Info className="h-4 w-4" />
+                                 </Button>
+                               </DialogTrigger>
+                               <DialogContent className="max-w-md">
+                                 <DialogHeader>
+                                   <DialogTitle className="flex items-center gap-2">
+                                     <Clock className="h-5 w-5" />
+                                     Session Info for {analysis.symbol}
+                                   </DialogTitle>
+                                 </DialogHeader>
+                                 
+                                 <div className="space-y-4">
+                                   {/* Current Status */}
+                                   <div className="p-3 bg-muted/50 rounded-lg">
+                                     <div className="flex items-center justify-between mb-2">
+                                       <span className="text-sm font-medium">Current Status</span>
+                                       <Badge variant={sessionInfo.currentSession.status === 'active' ? 'default' : 'outline'}>
+                                         {sessionInfo.currentSession.name}
+                                       </Badge>
+                                     </div>
+                                     <p className="text-xs text-muted-foreground">
+                                       {sessionInfo.recommendation}
+                                     </p>
+                                   </div>
+                                   
+                                   {/* Next Session */}
+                                   <div className="p-3 bg-muted/50 rounded-lg">
+                                     <div className="flex items-center justify-between mb-2">
+                                       <span className="text-sm font-medium">Next Optimal</span>
+                                       <span className="text-sm font-mono">{sessionInfo.nextSession.time}</span>
+                                     </div>
+                                     <p className="text-xs text-muted-foreground">
+                                       {sessionInfo.nextSession.name} in {sessionInfo.nextSession.hoursUntil} hours
+                                     </p>
+                                   </div>
+                                   
+                                   {/* Trading Tip */}
+                                   <div className="p-3 border border-primary/20 bg-primary/5 rounded-lg">
+                                     <div className="flex items-start gap-2">
+                                       <AlertTriangle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                                       <div>
+                                         <p className="text-sm font-medium text-primary">Trading Tip</p>
+                                         <p className="text-xs text-muted-foreground mt-1">
+                                           {sessionInfo.priority === 'highest' ? 
+                                             `Peak liquidity active for ${analysis.symbol}. Best time to trade with tight spreads.` :
+                                           sessionInfo.priority === 'high' ? 
+                                             `Optimal session active. Good volatility and volume for ${analysis.symbol}.` :
+                                           sessionInfo.priority === 'upcoming' ?
+                                             `Get ready! Optimal session begins soon with increased volatility.` :
+                                             `Consider waiting for next optimal session for better trading conditions.`}
+                                         </p>
+                                       </div>
+                                     </div>
+                                   </div>
+                                 </div>
+                               </DialogContent>
+                             </Dialog>
+                           </div>
+                         </div>
+                         
+                         <div className="flex gap-2 ml-4">
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => loadAnalysis(analysis)}
+                           >
+                             Load
+                           </Button>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => deleteAnalysis(analysis.id)}
+                             className="text-destructive hover:text-destructive"
+                           >
+                             <Trash2 className="h-4 w-4" />
+                           </Button>
+                         </div>
+                       </div>
+                     );
+                   })}
                 </div>
               )}
             </CardContent>
