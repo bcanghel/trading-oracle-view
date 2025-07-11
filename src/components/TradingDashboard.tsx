@@ -309,12 +309,78 @@ export function TradingDashboard() {
     return { 
       recommendation, 
       priority, 
-      nextSession, 
+      nextSession: getNextOptimalSessionForPair(symbol, currentHour, pairData), 
       currentSession: { 
         name: currentSessionName, 
         status: sessionStatus 
       },
       pairData
+    };
+  };
+
+  const getNextOptimalSessionForPair = (symbol: string, currentHour: number, pairData: any) => {
+    // Find next high-volume session based on pair-specific peak hours
+    const peakHours = pairData.peakHours;
+    const nextPeakHour = peakHours.find(hour => hour > currentHour) || peakHours[0];
+    const hoursUntil = nextPeakHour > currentHour ? 
+                      nextPeakHour - currentHour : 
+                      (24 - currentHour) + nextPeakHour;
+    
+    // Determine session name based on the next peak hour
+    let sessionName = '';
+    let sessionTime = '';
+    
+    if (['EUR/USD', 'GBP/USD', 'USD/CHF', 'EUR/GBP'].includes(symbol)) {
+      if (nextPeakHour >= 10 && nextPeakHour < 15) {
+        sessionName = 'London Open';
+        sessionTime = '10:00';
+      } else if (nextPeakHour >= 15 && nextPeakHour < 19) {
+        sessionName = 'London-NY Overlap';
+        sessionTime = '15:00';
+      } else {
+        sessionName = 'London Open';
+        sessionTime = nextPeakHour > currentHour ? '10:00' : '10:00 (Next Day)';
+      }
+    } else if (['USD/JPY', 'EUR/JPY', 'GBP/JPY'].includes(symbol)) {
+      if (nextPeakHour >= 2 && nextPeakHour < 11) {
+        sessionName = 'Tokyo Session';
+        sessionTime = '02:00';
+      } else if (nextPeakHour >= 15 && nextPeakHour < 21) {
+        sessionName = 'NY Session';
+        sessionTime = '15:00';
+      } else {
+        sessionName = 'Tokyo Session';
+        sessionTime = nextPeakHour > currentHour ? '02:00' : '02:00 (Next Day)';
+      }
+    } else if (['AUD/USD', 'NZD/USD'].includes(symbol)) {
+      if (nextPeakHour >= 0 && nextPeakHour < 9) {
+        sessionName = 'Sydney Session';
+        sessionTime = '00:00';
+      } else if (nextPeakHour >= 15 && nextPeakHour < 19) {
+        sessionName = 'NY Session';
+        sessionTime = '15:00';
+      } else {
+        sessionName = 'Sydney Session';
+        sessionTime = nextPeakHour > currentHour ? '00:00' : '00:00 (Next Day)';
+      }
+    } else if (symbol === 'USD/CAD') {
+      if (nextPeakHour >= 13 && nextPeakHour < 21) {
+        sessionName = 'North American Session';
+        sessionTime = '13:00';
+      } else {
+        sessionName = 'North American Session';
+        sessionTime = nextPeakHour > currentHour ? '13:00' : '13:00 (Next Day)';
+      }
+    } else {
+      // Default case
+      sessionName = 'Next High Volume Session';
+      sessionTime = `${nextPeakHour.toString().padStart(2, '0')}:00`;
+    }
+    
+    return {
+      name: sessionName,
+      time: sessionTime,
+      hoursUntil: hoursUntil
     };
   };
 
