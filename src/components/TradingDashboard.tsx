@@ -121,73 +121,73 @@ export function TradingDashboard() {
     const pairSessionData = {
       'EUR/USD': {
         primarySessions: ['London', 'New York'],
-        peakHours: [15, 16, 17, 18], // London-NY overlap
-        optimalVolume: 'Highest during 15:00-19:00',
-        characteristics: 'Most liquid pair, tight spreads',
-        recommendation: 'Best during London-NY overlap (15:00-19:00 Romania time)'
+        peakHours: [10, 11, 12, 13, 14, 15, 16, 17, 18], // London + London-NY overlap
+        optimalVolume: 'Highest during London session and London-NY overlap',
+        characteristics: 'Most liquid pair, tight spreads, highest volume',
+        recommendation: 'Trade during London session (10:00-19:00) - peak at overlap (15:00-19:00)'
       },
       'GBP/USD': {
         primarySessions: ['London', 'New York'],
-        peakHours: [10, 11, 12, 13, 14, 15, 16, 17],
-        optimalVolume: 'High during 10:00-18:00',
-        characteristics: 'High volatility, news-sensitive',
-        recommendation: 'Trade during London session (10:00-19:00 Romania time)'
+        peakHours: [10, 11, 12, 13, 14, 15, 16, 17, 18], // London + London-NY overlap
+        optimalVolume: 'Highest during London session and early NY',
+        characteristics: 'High volatility, news-sensitive, strong trends',
+        recommendation: 'Best during London session (10:00-19:00) - avoid Asian session'
       },
       'USD/JPY': {
         primarySessions: ['Tokyo', 'New York'],
-        peakHours: [2, 3, 4, 5, 15, 16, 17, 18],
+        peakHours: [2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 16, 17, 18, 19, 20], // Tokyo + NY sessions
         optimalVolume: 'High during Tokyo (02:00-11:00) and NY (15:00-24:00)',
-        characteristics: 'Lower volatility, trend-following',
-        recommendation: 'Active during Tokyo session and NY hours'
-      },
-      'AUD/USD': {
-        primarySessions: ['Sydney', 'New York'],
-        peakHours: [0, 1, 2, 15, 16, 17],
-        optimalVolume: 'Peak during Sydney open and NY session',
-        characteristics: 'Commodity-linked, RBA sensitive',
-        recommendation: 'Best during Sydney open (00:00-09:00) and NY overlap'
-      },
-      'EUR/JPY': {
-        primarySessions: ['Tokyo', 'London'],
-        peakHours: [2, 3, 4, 5, 10, 11, 12, 13],
-        optimalVolume: 'Active during Tokyo and London sessions',
-        characteristics: 'Medium volatility cross pair',
-        recommendation: 'Trade during Tokyo-London overlap and London session'
-      },
-      'GBP/JPY': {
-        primarySessions: ['Tokyo', 'London'],
-        peakHours: [2, 3, 4, 5, 10, 11, 12, 13, 14, 15],
-        optimalVolume: 'High during London session',
-        characteristics: 'Highly volatile, trending pair',
-        recommendation: 'High volatility during London session, moderate during Tokyo'
+        characteristics: 'Lower volatility, trend-following, interest rate sensitive',
+        recommendation: 'Active during Tokyo and NY sessions - avoid London-only hours'
       },
       'USD/CHF': {
         primarySessions: ['London', 'New York'],
-        peakHours: [10, 11, 12, 13, 14, 15, 16],
-        optimalVolume: 'Peak during European hours',
-        characteristics: 'Safe-haven currency, EUR correlation',
-        recommendation: 'Most active during European and early NY sessions'
+        peakHours: [10, 11, 12, 13, 14, 15, 16, 17], // European and early NY
+        optimalVolume: 'Peak during European trading hours',
+        characteristics: 'Safe-haven currency, EUR correlation, moderate volatility',
+        recommendation: 'Most active during London and early NY sessions'
       },
-      'EUR/GBP': {
-        primarySessions: ['London'],
-        peakHours: [10, 11, 12, 13, 14, 15, 16],
-        optimalVolume: 'Highest during London session',
-        characteristics: 'Low volatility, tight ranges',
-        recommendation: 'Trade only during London session for sufficient movement'
+      'AUD/USD': {
+        primarySessions: ['Sydney', 'New York'],
+        peakHours: [0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 17, 18], // Sydney + NY sessions
+        optimalVolume: 'Peak during Sydney open and NY session',
+        characteristics: 'Commodity-linked, RBA sensitive, volatile',
+        recommendation: 'Best during Sydney session (00:00-09:00) and NY hours - avoid mid-session lull'
       },
       'USD/CAD': {
         primarySessions: ['London', 'New York'],
-        peakHours: [14, 15, 16, 17, 18, 19],
-        optimalVolume: 'Peak during London-NY overlap',
-        characteristics: 'Oil-correlated, BOC sensitive',
-        recommendation: 'Best during North American trading hours'
+        peakHours: [13, 14, 15, 16, 17, 18, 19, 20], // London-NY overlap + NY session
+        optimalVolume: 'Peak during North American trading hours',
+        characteristics: 'Oil-correlated, BOC sensitive, North America focused',
+        recommendation: 'Best during London-NY overlap and NY session (13:00-21:00)'
       },
       'NZD/USD': {
         primarySessions: ['Sydney', 'New York'],
-        peakHours: [0, 1, 2, 15, 16, 17],
-        optimalVolume: 'Active during Sydney and NY sessions',
-        characteristics: 'Lower liquidity, RBNZ sensitive',
-        recommendation: 'Trade during Sydney open and NY hours'
+        peakHours: [0, 1, 2, 3, 4, 5, 6, 15, 16, 17], // Sydney + NY sessions
+        optimalVolume: 'Active during Sydney open and NY session',
+        characteristics: 'Lower liquidity, RBNZ sensitive, Pacific focus',
+        recommendation: 'Trade during Sydney session (00:00-09:00) and NY hours only'
+      },
+      'EUR/GBP': {
+        primarySessions: ['London'],
+        peakHours: [10, 11, 12, 13, 14, 15, 16, 17], // London session only
+        optimalVolume: 'Highest during London session only',
+        characteristics: 'Low volatility, tight ranges, requires London liquidity',
+        recommendation: 'Trade ONLY during London session (10:00-18:00) - insufficient volume outside'
+      },
+      'EUR/JPY': {
+        primarySessions: ['Tokyo', 'London'],
+        peakHours: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], // Tokyo + London + overlap
+        optimalVolume: 'Active during Tokyo and London sessions',
+        characteristics: 'Medium volatility cross pair, carry trade popular',
+        recommendation: 'Best during Tokyo and London sessions - good during overlap (10:00-11:00)'
+      },
+      'GBP/JPY': {
+        primarySessions: ['Tokyo', 'London'],
+        peakHours: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], // Tokyo + London sessions
+        optimalVolume: 'High during Tokyo and very high during London',
+        characteristics: 'Highly volatile, trending pair, big moves',
+        recommendation: 'High volatility during Tokyo, extreme during London - avoid quiet periods'
       }
     };
 
