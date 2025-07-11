@@ -115,41 +115,159 @@ export function TradingDashboard() {
   };
 
   const getPairSessionInfo = (symbol: string) => {
-    const currentSession = getSessionStatus();
+    const currentHour = getRomaniaHour();
+    
+    // Currency pair specific trading sessions and characteristics
+    const pairSessionData = {
+      'EUR/USD': {
+        primarySessions: ['London', 'New York'],
+        peakHours: [15, 16, 17, 18], // London-NY overlap
+        optimalVolume: 'Highest during 15:00-19:00',
+        characteristics: 'Most liquid pair, tight spreads',
+        recommendation: 'Best during London-NY overlap (15:00-19:00 Romania time)'
+      },
+      'GBP/USD': {
+        primarySessions: ['London', 'New York'],
+        peakHours: [10, 11, 12, 13, 14, 15, 16, 17],
+        optimalVolume: 'High during 10:00-18:00',
+        characteristics: 'High volatility, news-sensitive',
+        recommendation: 'Trade during London session (10:00-19:00 Romania time)'
+      },
+      'USD/JPY': {
+        primarySessions: ['Tokyo', 'New York'],
+        peakHours: [2, 3, 4, 5, 15, 16, 17, 18],
+        optimalVolume: 'High during Tokyo (02:00-11:00) and NY (15:00-24:00)',
+        characteristics: 'Lower volatility, trend-following',
+        recommendation: 'Active during Tokyo session and NY hours'
+      },
+      'AUD/USD': {
+        primarySessions: ['Sydney', 'New York'],
+        peakHours: [0, 1, 2, 15, 16, 17],
+        optimalVolume: 'Peak during Sydney open and NY session',
+        characteristics: 'Commodity-linked, RBA sensitive',
+        recommendation: 'Best during Sydney open (00:00-09:00) and NY overlap'
+      },
+      'EUR/JPY': {
+        primarySessions: ['Tokyo', 'London'],
+        peakHours: [2, 3, 4, 5, 10, 11, 12, 13],
+        optimalVolume: 'Active during Tokyo and London sessions',
+        characteristics: 'Medium volatility cross pair',
+        recommendation: 'Trade during Tokyo-London overlap and London session'
+      },
+      'GBP/JPY': {
+        primarySessions: ['Tokyo', 'London'],
+        peakHours: [2, 3, 4, 5, 10, 11, 12, 13, 14, 15],
+        optimalVolume: 'High during London session',
+        characteristics: 'Highly volatile, trending pair',
+        recommendation: 'High volatility during London session, moderate during Tokyo'
+      },
+      'USD/CHF': {
+        primarySessions: ['London', 'New York'],
+        peakHours: [10, 11, 12, 13, 14, 15, 16],
+        optimalVolume: 'Peak during European hours',
+        characteristics: 'Safe-haven currency, EUR correlation',
+        recommendation: 'Most active during European and early NY sessions'
+      },
+      'EUR/GBP': {
+        primarySessions: ['London'],
+        peakHours: [10, 11, 12, 13, 14, 15, 16],
+        optimalVolume: 'Highest during London session',
+        characteristics: 'Low volatility, tight ranges',
+        recommendation: 'Trade only during London session for sufficient movement'
+      },
+      'USD/CAD': {
+        primarySessions: ['London', 'New York'],
+        peakHours: [14, 15, 16, 17, 18, 19],
+        optimalVolume: 'Peak during London-NY overlap',
+        characteristics: 'Oil-correlated, BOC sensitive',
+        recommendation: 'Best during North American trading hours'
+      },
+      'NZD/USD': {
+        primarySessions: ['Sydney', 'New York'],
+        peakHours: [0, 1, 2, 15, 16, 17],
+        optimalVolume: 'Active during Sydney and NY sessions',
+        characteristics: 'Lower liquidity, RBNZ sensitive',
+        recommendation: 'Trade during Sydney open and NY hours'
+      }
+    };
+
+    const pairData = pairSessionData[symbol as keyof typeof pairSessionData] || {
+      primarySessions: ['London', 'New York'],
+      peakHours: [15, 16, 17, 18],
+      optimalVolume: 'Standard forex hours',
+      characteristics: 'Major currency pair',
+      recommendation: 'Most active during major session overlaps'
+    };
+
+    const isPeakTime = pairData.peakHours.includes(currentHour);
     const nextSession = getNextSession();
     
-    // Check if pair is optimal for current or next session
-    const asianPairs = ['USD/JPY', 'AUD/USD', 'NZD/USD', 'AUD/JPY'];
-    const europeanPairs = ['EUR/USD', 'GBP/USD', 'EUR/GBP', 'USD/CHF'];
-    const allPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY'];
+    // Determine current session status
+    let currentSessionName = '';
+    let sessionStatus = 'closed';
     
-    let recommendation = '';
-    let priority = 'medium';
-    
-    if (currentSession.status === 'active') {
-      if (currentSession.name === 'London-NY Overlap' && allPairs.includes(symbol)) {
-        recommendation = `Peak liquidity active for ${symbol}`;
-        priority = 'highest';
-      } else if (currentSession.name === 'London Session' && europeanPairs.includes(symbol)) {
-        recommendation = `Optimal session active for ${symbol}`;
-        priority = 'high';
-      } else if (currentSession.name === 'Asian Session' && asianPairs.includes(symbol)) {
-        recommendation = `Good session for ${symbol} range trading`;
-        priority = 'medium';
+    if (currentHour >= 2 && currentHour < 11) {
+      currentSessionName = 'Asian Session';
+      sessionStatus = 'active';
+    } else if (currentHour >= 10 && currentHour < 19) {
+      currentSessionName = 'London Session';
+      sessionStatus = 'active';
+      if (currentHour >= 15 && currentHour < 19) {
+        currentSessionName = 'London-NY Overlap';
       }
+    } else if (currentHour >= 15 && currentHour < 24) {
+      currentSessionName = 'New York Session';
+      sessionStatus = 'active';
     }
     
-    if (!recommendation) {
-      if (nextSession.hoursUntil <= 2) {
-        recommendation = `${nextSession.name} begins in ${nextSession.hoursUntil}h ${((nextSession.hoursUntil % 1) * 60).toFixed(0)}m`;
+    // Calculate specific recommendation and priority
+    let recommendation = '';
+    let priority = 'low';
+    
+    if (isPeakTime && sessionStatus === 'active') {
+      if (currentHour >= 15 && currentHour < 19 && 
+          (symbol === 'EUR/USD' || symbol === 'GBP/USD' || symbol === 'USD/CHF')) {
+        recommendation = `Peak liquidity for ${symbol} - highest volume and tightest spreads`;
+        priority = 'highest';
+      } else if (currentSessionName === 'London Session' && 
+                 ['EUR/USD', 'GBP/USD', 'EUR/GBP', 'USD/CHF'].includes(symbol)) {
+        recommendation = `Optimal ${symbol} trading - European session active`;
+        priority = 'high';
+      } else if (currentSessionName === 'Asian Session' && 
+                 ['USD/JPY', 'AUD/USD', 'NZD/USD', 'EUR/JPY', 'GBP/JPY'].includes(symbol)) {
+        recommendation = `Good ${symbol} session - Asian markets active`;
+        priority = 'medium';
+      } else {
+        recommendation = `${symbol} trading active - ${pairData.characteristics}`;
+        priority = 'medium';
+      }
+    } else {
+      // Not in peak time
+      const nextPeakHour = pairData.peakHours.find(hour => hour > currentHour) || 
+                           pairData.peakHours[0];
+      const hoursUntil = nextPeakHour > currentHour ? 
+                        nextPeakHour - currentHour : 
+                        (24 - currentHour) + nextPeakHour;
+      
+      if (hoursUntil <= 2) {
+        recommendation = `${symbol} optimal session starts in ${hoursUntil}h`;
         priority = 'upcoming';
       } else {
-        recommendation = `Next optimal: ${nextSession.name}`;
+        recommendation = `Wait ${hoursUntil}h for optimal ${symbol} conditions`;
         priority = 'low';
       }
     }
     
-    return { recommendation, priority, nextSession, currentSession };
+    return { 
+      recommendation, 
+      priority, 
+      nextSession, 
+      currentSession: { 
+        name: currentSessionName, 
+        status: sessionStatus 
+      },
+      pairData
+    };
   };
 
   const analyzeMarket = async () => {
@@ -513,24 +631,26 @@ export function TradingDashboard() {
                                      </p>
                                    </div>
                                    
-                                   {/* Trading Tip */}
-                                   <div className="p-3 border border-primary/20 bg-primary/5 rounded-lg">
-                                     <div className="flex items-start gap-2">
-                                       <AlertTriangle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                                       <div>
-                                         <p className="text-sm font-medium text-primary">Trading Tip</p>
-                                         <p className="text-xs text-muted-foreground mt-1">
-                                           {sessionInfo.priority === 'highest' ? 
-                                             `Peak liquidity active for ${analysis.symbol}. Best time to trade with tight spreads.` :
-                                           sessionInfo.priority === 'high' ? 
-                                             `Optimal session active. Good volatility and volume for ${analysis.symbol}.` :
-                                           sessionInfo.priority === 'upcoming' ?
-                                             `Get ready! Optimal session begins soon with increased volatility.` :
-                                             `Consider waiting for next optimal session for better trading conditions.`}
-                                         </p>
-                                       </div>
-                                     </div>
-                                   </div>
+                                    {/* Trading Tip */}
+                                    <div className="p-3 border border-primary/20 bg-primary/5 rounded-lg">
+                                      <div className="flex items-start gap-2">
+                                        <AlertTriangle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                                        <div>
+                                          <p className="text-sm font-medium text-primary">Trading Tip for {analysis.symbol}</p>
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            {sessionInfo.pairData.recommendation}
+                                          </p>
+                                          <div className="mt-2 space-y-1">
+                                            <p className="text-xs text-muted-foreground">
+                                              <span className="font-medium">Characteristics:</span> {sessionInfo.pairData.characteristics}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                              <span className="font-medium">Volume:</span> {sessionInfo.pairData.optimalVolume}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
                                  </div>
                                </DialogContent>
                              </Dialog>
