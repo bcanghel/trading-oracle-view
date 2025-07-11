@@ -23,9 +23,14 @@ serve(async (req) => {
     const technicalAnalysis = calculateTechnicalIndicators(historicalData);
     const trendAnalysis = analyzeTrend(historicalData);
     
+    // Get current Romania time and market session info
+    const romaniaTime = new Date();
+    const romaniaHour = (romaniaTime.getUTCHours() + 2) % 24; // Romania is UTC+2 (UTC+3 in summer)
+    const marketSession = getMarketSession(romaniaHour);
+    
     // Create analysis prompt for OpenAI
     const analysisPrompt = `
-Analyze the forex market data for ${symbol} and provide a trading recommendation.
+Analyze the forex market data for ${symbol} and provide a trading recommendation with enhanced entry conditions and market timing.
 
 Current Market Data:
 - Current Price: ${currentData.currentPrice}
@@ -49,6 +54,13 @@ Trend Analysis (24h):
 - Recent Candle Patterns: ${trendAnalysis.candlePatterns}
 - Volume Trend: ${trendAnalysis.volumeTrend}
 
+Market Session Analysis (Romania Time):
+- Current Romania Time: ${romaniaTime.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' })}
+- Active Market Session: ${marketSession.name}
+- Session Status: ${marketSession.status}
+- Volatility Level: ${marketSession.volatility}
+- Trading Recommendation: ${marketSession.recommendation}
+
 Historical Data (last 12 candles):
 ${historicalData.slice(-12).map((candle: any, index: number) => 
   `${index + 1}. ${candle.datetime}: O:${candle.open} H:${candle.high} L:${candle.low} C:${candle.close}`
@@ -64,8 +76,24 @@ Provide a JSON response with this EXACT structure:
   "support": "number - key support level",
   "resistance": "number - key resistance level", 
   "reasoning": "detailed 2-3 sentence explanation",
-  "riskReward": "number - risk to reward ratio"
+  "riskReward": "number - risk to reward ratio",
+  "entryConditions": "string - specific trigger conditions for entry",
+  "entryTiming": "string - timing guidance and session considerations",
+  "volumeConfirmation": "string - volume requirements for entry",
+  "candlestickSignals": "string - candlestick confirmation patterns to watch for"
 }
+
+ENHANCED ENTRY CONDITIONS ANALYSIS:
+- Specify exact trigger conditions (e.g., "Wait for price to test 1.0850 support + bullish hammer + volume spike >150% average")
+- Include candlestick confirmation requirements (hammers, engulfing patterns, doji reversals)
+- Define volume confirmation criteria (volume spikes, above-average volume)
+- Consider moving average interactions (bounces, breaks, retests)
+
+ENTRY TIMING & MARKET SESSION GUIDANCE:
+- Consider current market session volatility and liquidity
+- High volatility sessions (London-NY overlap): More aggressive entries possible
+- Low volatility sessions (Asian): More conservative, wait for clear breakouts
+- Account for session transitions and their impact on price action
 
 CONFIDENCE CALCULATION GUIDELINES:
 - 85-95%: Very strong signals (multiple confluences, clear trend, low risk)
@@ -81,7 +109,7 @@ ENTRY LEVEL RULES:
 - Base on fibonacci retracements, support/resistance retests, or moving average bounces
 - Do NOT use current market price as entry
 
-Consider: RSI levels, moving average positions, support/resistance strength, trend alignment, volume confirmation, and overall market structure.
+Consider: RSI levels, moving average positions, support/resistance strength, trend alignment, volume confirmation, market session timing, and overall market structure.
 `;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -342,5 +370,82 @@ function analyzeTrend(data: any[]) {
     higherLows,
     candlePatterns,
     volumeTrend
+  };
+}
+
+function getMarketSession(romaniaHour: number) {
+  // Market sessions in Romania time (UTC+2/+3)
+  const sessions = [
+    {
+      name: 'Sydney Session',
+      start: 0, end: 9,
+      volatility: 'Low',
+      recommendation: 'Conservative entries, wait for clear signals'
+    },
+    {
+      name: 'Tokyo Session', 
+      start: 2, end: 11,
+      volatility: 'Medium',
+      recommendation: 'Focus on JPY pairs, moderate volatility'
+    },
+    {
+      name: 'London Session',
+      start: 10, end: 19,
+      volatility: 'High', 
+      recommendation: 'High volatility, good for breakouts'
+    },
+    {
+      name: 'New York Session',
+      start: 15, end: 24,
+      volatility: 'High',
+      recommendation: 'USD pairs active, trend following'
+    }
+  ];
+
+  // Find active sessions
+  const activeSessions = sessions.filter(session => {
+    if (session.end > 24) {
+      return romaniaHour >= session.start || romaniaHour <= (session.end - 24);
+    }
+    return romaniaHour >= session.start && romaniaHour < session.end;
+  });
+
+  // Check for overlap periods (higher volatility)
+  const isLondonNYOverlap = romaniaHour >= 15 && romaniaHour < 19;
+  const isTokyoLondonOverlap = romaniaHour >= 10 && romaniaHour < 11;
+
+  if (isLondonNYOverlap) {
+    return {
+      name: 'London-New York Overlap',
+      status: 'High Activity',
+      volatility: 'Very High',
+      recommendation: 'Prime trading time - aggressive entries possible, major news impact'
+    };
+  }
+
+  if (isTokyoLondonOverlap) {
+    return {
+      name: 'Tokyo-London Overlap', 
+      status: 'Medium Activity',
+      volatility: 'Medium-High',
+      recommendation: 'Good for EUR/JPY, GBP/JPY pairs'
+    };
+  }
+
+  if (activeSessions.length > 0) {
+    const primarySession = activeSessions[0];
+    return {
+      name: primarySession.name,
+      status: 'Active',
+      volatility: primarySession.volatility,
+      recommendation: primarySession.recommendation
+    };
+  }
+
+  return {
+    name: 'Market Closed',
+    status: 'Low Activity',
+    volatility: 'Very Low', 
+    recommendation: 'Avoid trading, wait for market open'
   };
 }

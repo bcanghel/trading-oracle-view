@@ -20,6 +20,10 @@ interface TradingRecommendation {
   resistance: number;
   reasoning: string;
   riskReward: number;
+  entryConditions?: string;
+  entryTiming?: string;
+  volumeConfirmation?: string;
+  candlestickSignals?: string;
 }
 
 interface MarketData {
@@ -475,6 +479,53 @@ export function TradingDashboard() {
                 <h4 className="font-semibold mb-2">Analysis Reasoning</h4>
                 <p className="text-muted-foreground leading-relaxed">{recommendation.reasoning}</p>
               </div>
+
+              {/* Enhanced Entry Conditions Section */}
+              {(recommendation.entryConditions || recommendation.entryTiming || recommendation.volumeConfirmation || recommendation.candlestickSignals) && (
+                <>
+                  <Separator />
+                  
+                  <div className="space-y-4">
+                    <h4 className="font-semibold text-base">Entry Conditions & Market Timing</h4>
+                    
+                    {recommendation.entryConditions && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">Entry Trigger Conditions</p>
+                        <div className="bg-muted/50 p-3 rounded-lg border-l-4 border-primary">
+                          <p className="text-sm leading-relaxed">{recommendation.entryConditions}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {recommendation.entryTiming && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">Market Session & Timing</p>
+                        <div className="bg-muted/50 p-3 rounded-lg border-l-4 border-blue-500">
+                          <p className="text-sm leading-relaxed">{recommendation.entryTiming}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {recommendation.volumeConfirmation && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">Volume Confirmation</p>
+                        <div className="bg-muted/50 p-3 rounded-lg border-l-4 border-green-500">
+                          <p className="text-sm leading-relaxed">{recommendation.volumeConfirmation}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {recommendation.candlestickSignals && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">Candlestick Confirmation Signals</p>
+                        <div className="bg-muted/50 p-3 rounded-lg border-l-4 border-orange-500">
+                          <p className="text-sm leading-relaxed">{recommendation.candlestickSignals}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         ) : marketData && (
