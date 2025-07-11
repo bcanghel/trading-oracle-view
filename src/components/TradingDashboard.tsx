@@ -242,18 +242,66 @@ export function TradingDashboard() {
         priority = 'medium';
       }
     } else {
-      // Not in peak time
-      const nextPeakHour = pairData.peakHours.find(hour => hour > currentHour) || 
-                           pairData.peakHours[0];
-      const hoursUntil = nextPeakHour > currentHour ? 
-                        nextPeakHour - currentHour : 
-                        (24 - currentHour) + nextPeakHour;
+      // Not in peak time - find next optimal session for this specific pair
+      let nextOptimalHour;
+      let nextSessionName;
+      
+      if (['EUR/USD', 'GBP/USD', 'USD/CHF', 'EUR/GBP'].includes(symbol)) {
+        // European pairs - prioritize London and NY sessions
+        if (currentHour < 10) {
+          nextOptimalHour = 10;
+          nextSessionName = 'London Open';
+        } else if (currentHour < 15) {
+          nextOptimalHour = 15;
+          nextSessionName = 'London-NY Overlap';
+        } else if (currentHour >= 19) {
+          nextOptimalHour = 10; // Next day London
+          nextSessionName = 'London Open (Next Day)';
+        }
+      } else if (['USD/JPY', 'EUR/JPY', 'GBP/JPY'].includes(symbol)) {
+        // JPY pairs - Tokyo and London sessions
+        if (currentHour < 2) {
+          nextOptimalHour = 2;
+          nextSessionName = 'Tokyo Open';
+        } else if (currentHour >= 11 && currentHour < 15) {
+          nextOptimalHour = 15;
+          nextSessionName = 'NY Session';
+        } else if (currentHour >= 19) {
+          nextOptimalHour = 2; // Next day Tokyo
+          nextSessionName = 'Tokyo Open (Next Day)';
+        }
+      } else if (['AUD/USD', 'NZD/USD'].includes(symbol)) {
+        // Pacific pairs - Sydney and NY sessions
+        if (currentHour >= 9 && currentHour < 15) {
+          nextOptimalHour = 15;
+          nextSessionName = 'NY Session';
+        } else if (currentHour >= 19) {
+          nextOptimalHour = 0; // Next day Sydney
+          nextSessionName = 'Sydney Open (Next Day)';
+        } else {
+          nextOptimalHour = 0;
+          nextSessionName = 'Sydney Open';
+        }
+      } else {
+        // Default to major sessions
+        if (currentHour < 10) {
+          nextOptimalHour = 10;
+          nextSessionName = 'London Open';
+        } else {
+          nextOptimalHour = 15;
+          nextSessionName = 'NY Session';
+        }
+      }
+      
+      const hoursUntil = nextOptimalHour > currentHour ? 
+                        nextOptimalHour - currentHour : 
+                        (24 - currentHour) + nextOptimalHour;
       
       if (hoursUntil <= 2) {
         recommendation = `${symbol} optimal session starts in ${hoursUntil}h`;
         priority = 'upcoming';
       } else {
-        recommendation = `Wait ${hoursUntil}h for optimal ${symbol} conditions`;
+        recommendation = `Wait ${hoursUntil}h for optimal ${symbol} trading (${nextSessionName})`;
         priority = 'low';
       }
     }
