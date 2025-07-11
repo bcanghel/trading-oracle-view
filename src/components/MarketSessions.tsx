@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, TrendingUp, Volume2, Globe } from 'lucide-react';
+import { Clock, TrendingUp, Volume2, Globe, AlertCircle } from 'lucide-react';
 
 interface SessionInfo {
   name: string;
@@ -12,7 +12,6 @@ interface SessionInfo {
   volumeMultiplier: number;
   characteristics: string[];
   reasons: string[];
-  color: string;
   pairs: string[];
 }
 
@@ -75,7 +74,6 @@ export function MarketSessions() {
         'Consolidation after NY close',
         'Good for position building'
       ],
-      color: 'bg-blue-500',
       pairs: ['USD/JPY', 'AUD/USD', 'NZD/USD', 'AUD/JPY']
     },
     {
@@ -92,7 +90,6 @@ export function MarketSessions() {
         'Strong trending moves',
         'Best breakout opportunities'
       ],
-      color: 'bg-green-500',
       pairs: ['EUR/USD', 'GBP/USD', 'EUR/GBP', 'USD/CHF']
     },
     {
@@ -110,7 +107,6 @@ export function MarketSessions() {
         'Best execution for large trades',
         'Major news impact amplified'
       ],
-      color: 'bg-red-500',
       pairs: ['All Major Pairs', 'EUR/USD', 'GBP/USD', 'USD/JPY']
     },
     {
@@ -127,7 +123,6 @@ export function MarketSessions() {
         'Strong USD pair movements',
         'End-of-day position adjustments'
       ],
-      color: 'bg-purple-500',
       pairs: ['USD/CAD', 'EUR/USD', 'GBP/USD', 'USD/JPY']
     }
   ];
@@ -179,17 +174,34 @@ export function MarketSessions() {
 
   const optimalTimes = getOptimalEntryTimes();
 
+  const getPriorityBadgeVariant = (priority: string) => {
+    switch (priority) {
+      case 'highest': return 'destructive';
+      case 'high': return 'default';
+      case 'medium': return 'secondary';
+      default: return 'outline';
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'active': return 'default';
+      case 'upcoming': return 'secondary';
+      default: return 'outline';
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Current Time Display */}
-      <Card>
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-primary">
               <Clock className="h-5 w-5" />
               Current Romania Time
             </CardTitle>
-            <div className="text-2xl font-mono font-bold text-primary">
+            <div className="text-3xl font-mono font-bold text-primary bg-background/50 px-4 py-2 rounded-lg">
               {getRomaniaTime(currentTime)}
             </div>
           </div>
@@ -200,41 +212,31 @@ export function MarketSessions() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
+            <TrendingUp className="h-5 w-5 text-primary" />
             Optimal Entry Times Today
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="grid gap-3">
             {optimalTimes.map((entry, index) => (
               <div
                 key={index}
-                className={`flex items-center justify-between p-3 rounded-lg border ${
-                  entry.priority === 'highest' ? 'bg-red-50 border-red-200' :
-                  entry.priority === 'high' ? 'bg-orange-50 border-orange-200' :
-                  entry.priority === 'medium' ? 'bg-yellow-50 border-yellow-200' :
-                  'bg-blue-50 border-blue-200'
-                }`}
+                className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-lg">{entry.time}</span>
-                    <Badge variant={
-                      entry.priority === 'highest' ? 'destructive' :
-                      entry.priority === 'high' ? 'default' :
-                      entry.priority === 'medium' ? 'secondary' :
-                      'outline'
-                    }>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="font-mono font-bold text-xl text-foreground">{entry.time}</span>
+                    <Badge variant={getPriorityBadgeVariant(entry.priority)}>
                       {entry.session}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">{entry.reason}</p>
+                  <p className="text-sm text-muted-foreground">{entry.reason}</p>
                 </div>
                 <div className={`w-3 h-3 rounded-full ${
-                  entry.priority === 'highest' ? 'bg-red-500' :
-                  entry.priority === 'high' ? 'bg-orange-500' :
-                  entry.priority === 'medium' ? 'bg-yellow-500' :
-                  'bg-blue-500'
+                  entry.priority === 'highest' ? 'bg-destructive' :
+                  entry.priority === 'high' ? 'bg-primary' :
+                  entry.priority === 'medium' ? 'bg-secondary' :
+                  'bg-muted-foreground'
                 }`} />
               </div>
             ))}
@@ -242,50 +244,55 @@ export function MarketSessions() {
         </CardContent>
       </Card>
 
-      {/* Market Sessions */}
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* Market Sessions Grid */}
+      <div className="grid gap-6 md:grid-cols-2">
         {sessions.map((session) => (
-          <Card key={session.name} className="relative overflow-hidden">
-            <div className={`absolute top-0 left-0 w-1 h-full ${session.color}`} />
-            <CardHeader className="pb-3">
+          <Card key={session.name} className={`relative overflow-hidden transition-all hover:shadow-lg ${
+            session.status === 'active' ? 'ring-2 ring-primary/50 bg-primary/5' : ''
+          }`}>
+            <div className={`absolute top-0 left-0 w-1 h-full ${
+              session.status === 'active' ? 'bg-primary' :
+              session.status === 'upcoming' ? 'bg-secondary' :
+              'bg-muted'
+            }`} />
+            
+            <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Globe className="h-4 w-4" />
                   {session.name}
                 </CardTitle>
-                <Badge variant={
-                  session.status === 'active' ? 'default' :
-                  session.status === 'upcoming' ? 'secondary' :
-                  'outline'
-                }>
+                <Badge variant={getStatusBadgeVariant(session.status)}>
                   {session.status}
                 </Badge>
               </div>
             </CardHeader>
+            
             <CardContent className="space-y-4">
               {/* Time Information */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Session:</span>
-                  <span className="font-mono">{session.startTime} - {session.endTime}</span>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground block">Session</span>
+                  <span className="font-mono font-medium">{session.startTime} - {session.endTime}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Peak:</span>
-                  <span className="font-mono font-medium">{session.peakTime}</span>
+                <div>
+                  <span className="text-muted-foreground block">Peak</span>
+                  <span className="font-mono font-medium text-primary">{session.peakTime}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Volume:</span>
-                  <div className="flex items-center gap-1">
-                    <Volume2 className="h-3 w-3" />
-                    <span>{session.volumeMultiplier}x</span>
-                  </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm bg-muted/50 p-3 rounded-lg">
+                <span className="text-muted-foreground">Volume Multiplier</span>
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4 text-primary" />
+                  <span className="font-bold text-primary">{session.volumeMultiplier}x</span>
                 </div>
               </div>
 
               {/* Characteristics */}
               <div>
-                <h4 className="text-sm font-medium mb-2">Characteristics</h4>
-                <div className="flex flex-wrap gap-1">
+                <h4 className="text-sm font-medium mb-2 text-muted-foreground">Market Characteristics</h4>
+                <div className="flex flex-wrap gap-2">
                   {session.characteristics.map((char, index) => (
                     <Badge key={index} variant="outline" className="text-xs">
                       {char}
@@ -296,23 +303,23 @@ export function MarketSessions() {
 
               {/* Trading Reasons */}
               <div>
-                <h4 className="text-sm font-medium mb-2">Why Trade This Session</h4>
-                <ul className="space-y-1">
-                  {session.reasons.map((reason, index) => (
-                    <li key={index} className="text-xs text-muted-foreground flex items-start gap-1">
-                      <span className="text-primary mt-1">•</span>
+                <h4 className="text-sm font-medium mb-2 text-muted-foreground">Trading Advantages</h4>
+                <div className="space-y-1">
+                  {session.reasons.slice(0, 2).map((reason, index) => (
+                    <div key={index} className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <div className="w-1 h-1 bg-primary rounded-full mt-2 flex-shrink-0" />
                       {reason}
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
 
               {/* Best Pairs */}
               <div>
-                <h4 className="text-sm font-medium mb-2">Focus Pairs</h4>
+                <h4 className="text-sm font-medium mb-2 text-muted-foreground">Focus Pairs</h4>
                 <div className="flex flex-wrap gap-1">
-                  {session.pairs.map((pair, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
+                  {session.pairs.slice(0, 3).map((pair, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs font-mono">
                       {pair}
                     </Badge>
                   ))}
@@ -323,60 +330,70 @@ export function MarketSessions() {
         ))}
       </div>
 
-      {/* Session Overlap Visual */}
+      {/* Session Timeline */}
       <Card>
         <CardHeader>
-          <CardTitle>24-Hour Session Timeline (Romania Time)</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            24-Hour Session Timeline (Romania Time)
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="relative h-16 bg-muted rounded-lg overflow-hidden">
+          <div className="relative h-20 bg-muted/30 rounded-lg overflow-hidden border">
             {/* Asian Session */}
-            <div className="absolute h-4 bg-blue-500 opacity-60 top-2"
-                 style={{ left: '8.33%', width: '37.5%' }} />
+            <div className="absolute h-6 bg-blue-500/60 rounded top-2 border border-blue-500/40"
+                 style={{ left: '8.33%', width: '37.5%' }}>
+              <span className="text-xs text-white font-medium pl-2 pt-1 block">Asian</span>
+            </div>
+            
             {/* London Session */}
-            <div className="absolute h-4 bg-green-500 opacity-60 top-6"
-                 style={{ left: '41.67%', width: '37.5%' }} />
+            <div className="absolute h-6 bg-green-500/60 rounded top-9 border border-green-500/40"
+                 style={{ left: '41.67%', width: '37.5%' }}>
+              <span className="text-xs text-white font-medium pl-2 pt-1 block">London</span>
+            </div>
+            
             {/* NY Session */}
-            <div className="absolute h-4 bg-purple-500 opacity-60 top-10"
-                 style={{ left: '62.5%', width: '37.5%' }} />
+            <div className="absolute h-6 bg-purple-500/60 rounded bottom-2 border border-purple-500/40"
+                 style={{ left: '62.5%', width: '37.5%' }}>
+              <span className="text-xs text-white font-medium pl-2 pt-1 block">New York</span>
+            </div>
             
             {/* Time markers */}
-            <div className="absolute top-0 h-full w-px bg-border" style={{ left: '0%' }}>
-              <span className="absolute -bottom-6 -left-4 text-xs">00:00</span>
-            </div>
-            <div className="absolute top-0 h-full w-px bg-border" style={{ left: '25%' }}>
-              <span className="absolute -bottom-6 -left-4 text-xs">06:00</span>
-            </div>
-            <div className="absolute top-0 h-full w-px bg-border" style={{ left: '50%' }}>
-              <span className="absolute -bottom-6 -left-4 text-xs">12:00</span>
-            </div>
-            <div className="absolute top-0 h-full w-px bg-border" style={{ left: '75%' }}>
-              <span className="absolute -bottom-6 -left-4 text-xs">18:00</span>
-            </div>
+            {[0, 6, 12, 18].map((hour, index) => (
+              <div key={hour} className="absolute top-0 h-full w-px bg-border" style={{ left: `${(hour / 24) * 100}%` }}>
+                <span className="absolute -bottom-6 -left-4 text-xs text-muted-foreground font-mono">
+                  {hour.toString().padStart(2, '0')}:00
+                </span>
+              </div>
+            ))}
             
             {/* Current time indicator */}
             <div 
-              className="absolute top-0 h-full w-0.5 bg-red-500 z-10"
+              className="absolute top-0 h-full w-0.5 bg-destructive z-10 animate-pulse"
               style={{ left: `${(getRomaniaHour(currentTime) / 24) * 100}%` }}
             >
-              <div className="absolute -top-2 -left-2 w-4 h-4 bg-red-500 rounded-full" />
+              <div className="absolute -top-2 -left-2 w-4 h-4 bg-destructive rounded-full border-2 border-background" />
+              <span className="absolute -bottom-6 -left-6 text-xs font-mono font-bold text-destructive">
+                NOW
+              </span>
             </div>
           </div>
-          <div className="mt-6 flex gap-4 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-blue-500 rounded" />
-              <span>Asian</span>
+          
+          <div className="mt-8 flex flex-wrap gap-4 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-blue-500/60 border border-blue-500/40 rounded" />
+              <span>Asian Session</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-green-500 rounded" />
-              <span>London</span>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-green-500/60 border border-green-500/40 rounded" />
+              <span>London Session</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-purple-500 rounded" />
-              <span>New York</span>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-purple-500/60 border border-purple-500/40 rounded" />
+              <span>New York Session</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-red-500 rounded" />
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-destructive rounded" />
               <span>Current Time</span>
             </div>
           </div>
