@@ -106,7 +106,7 @@ Provide a JSON response with this EXACT structure:
 {
   "action": "BUY, SELL, or HOLD",
   "confidence": "integer from 10-95 based on your analysis",
-  "entry": "number - your optimal entry level",
+  "entry": "number - your predicted FUTURE entry level (NOT current price - should be at key support/resistance/technical level)",
   "stopLoss": "number - your stop loss level",
   "takeProfit": "number - your take profit level",
   "support": "number - key support level you identify",
@@ -124,7 +124,10 @@ DECISION GUIDELINES:
 - Use the enhanced technical data to make informed decisions
 - Consider market context, session timing, and overall market structure
 - Provide clear reasoning for your recommendations
-- Base confidence on the strength of your analysis and market conditions`;
+- Base confidence on the strength of your analysis and market conditions
+- IMPORTANT: Entry level must be a strategic level based on support/resistance, not current price
+- Entry should be where price is likely to reach based on technical confluence
+- Consider retracements, breakout levels, or continuation patterns for entry timing`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
