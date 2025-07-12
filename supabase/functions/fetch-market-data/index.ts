@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { symbol } = await req.json();
+    const { symbol, strategy = '1H' } = await req.json();
     const twelveApiKey = Deno.env.get('TWELVE_API');
 
     console.log(`Starting analysis for symbol: ${symbol}`);
@@ -68,9 +68,27 @@ serve(async (req) => {
               console.log(`Historical API response for ${testSymbol}:`, JSON.stringify(testHistoricalData, null, 2));
               
               if (testHistoricalData.status !== 'error' && testHistoricalData.values) {
+                let historical4hData = null;
+                
+                // If strategy includes 4H data, fetch it
+                if (strategy === '1H+4H') {
+                  const historical4hUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(testSymbol)}&interval=4h&outputsize=12&apikey=${twelveApiKey}`;
+                  console.log(`4H Historical URL: ${historical4hUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
+                  
+                  const historical4hResponse = await fetch(historical4hUrl);
+                  if (historical4hResponse.ok) {
+                    const test4hData = await historical4hResponse.json();
+                    if (test4hData.status !== 'error' && test4hData.values) {
+                      historical4hData = test4hData;
+                      console.log(`Successfully fetched 4H data for ${testSymbol}`);
+                    }
+                  }
+                }
+                
                 // Both calls successful!
                 quoteData = testQuoteData;
                 historicalData = testHistoricalData;
+                historicalData.historical4h = historical4hData; // Add 4H data to the main object
                 workingSymbol = testSymbol;
                 console.log(`Successfully found data for symbol format: ${testSymbol}`);
                 break;
@@ -223,15 +241,34 @@ serve(async (req) => {
       sessionMultiplier: c.sessionMultiplier
     })));
 
+    // Process 4H data if available
+    let historical4hProcessed = null;
+    if (historicalData.historical4h?.values) {
+      const processed4hData = historicalData.historical4h.values.map((candle: any) => ({
+        datetime: candle.datetime,
+        open: parseFloat(candle.open),
+        high: parseFloat(candle.high),
+        low: parseFloat(candle.low),
+        close: parseFloat(candle.close),
+        volume: 0, // Will be calculated below
+      })).reverse();
+      
+      historical4hProcessed = calculateForexVolume(processed4hData);
+      console.log(`Processed ${historical4hProcessed.length} 4H candles`);
+    }
+
     return new Response(
       JSON.stringify({
         currentData,
         historicalData: validHistoricalData,
+        historical4hData: historical4hProcessed,
+        strategy,
         success: true,
         metadata: {
           totalCandles: processedHistoricalData.length,
           validCandles: validHistoricalData.length,
-          filteredCandles: processedHistoricalData.length - validHistoricalData.length
+          filteredCandles: processedHistoricalData.length - validHistoricalData.length,
+          has4hData: !!historical4hProcessed
         }
       }),
       {

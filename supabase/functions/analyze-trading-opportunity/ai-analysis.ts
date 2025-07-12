@@ -7,7 +7,9 @@ export async function analyzeWithAI(
   technicalAnalysis: any,
   trendAnalysis: any,
   marketSession: any,
-  romaniaTime: Date
+  romaniaTime: Date,
+  strategy: string = '1H',
+  historical4hData: any[] | null = null
 ) {
   // Calculate algorithmic suggestions as assistive information
   const algorithmicSuggestion = calculateEntrySignal({
@@ -24,9 +26,36 @@ export async function analyzeWithAI(
     throw new Error('OpenAI API key not configured');
   }
 
+  // Enhanced prompt for multi-timeframe analysis
+  const multiTimeframeContext = strategy === '1H+4H' && technicalAnalysis.multiTimeframe ? `
+
+## MULTI-TIMEFRAME ANALYSIS (1H + 4H Strategy)
+- **Timeframe Confluence Score**: ${technicalAnalysis.multiTimeframe.confluence}%
+- **Trend Agreement**: ${technicalAnalysis.multiTimeframe.agreement ? 'YES' : 'NO'}
+- **4H Technical Data**: 
+  - RSI: ${technicalAnalysis.multiTimeframe.higher4h.rsi}
+  - SMA10: ${technicalAnalysis.multiTimeframe.higher4h.sma10}
+  - SMA20: ${technicalAnalysis.multiTimeframe.higher4h.sma20}
+  - Support: ${technicalAnalysis.multiTimeframe.higher4h.support}
+  - Resistance: ${technicalAnalysis.multiTimeframe.higher4h.resistance}
+
+**Multi-Timeframe Analysis Requirements:**
+- Only consider high-confidence setups when confluence score > 70%
+- Require both 1H and 4H trend alignment for trend-following trades
+- Use 4H levels for major support/resistance, 1H levels for fine-tuned entries
+- Increase confidence when both timeframes show same signals
+- Adjust risk/reward based on higher timeframe context
+` : '';
+
+  const strategyNote = strategy === '1H+4H' ? 
+    'This analysis uses ENHANCED MULTI-TIMEFRAME strategy (1H + 4H)' : 
+    'This analysis uses STANDARD 1H strategy';
+
   // Create enhanced analysis prompt with algorithmic assistance
   const analysisPrompt = `
-Analyze the forex market data for ${symbol} and provide your trading recommendation. Use the algorithmic calculations as assistive information to inform your decision.
+${strategyNote}
+
+Analyze the forex market data for ${symbol} and provide your trading recommendation. Use the algorithmic calculations as assistive information to inform your decision.${multiTimeframeContext}
 
 ALGORITHMIC ASSISTANCE (for reference):
 - Suggested Strategy: ${algorithmicSuggestion.strategy}

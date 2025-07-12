@@ -45,6 +45,7 @@ interface SavedAnalysis {
   api_response: any;
   ai_analysis: any;
   created_at: string;
+  strategy_type: string;
 }
 
 const FOREX_PAIRS = [
@@ -63,10 +64,13 @@ const FOREX_PAIRS = [
 export function TradingDashboard() {
   const { toast } = useToast();
   const [selectedPair, setSelectedPair] = useState<string>("");
+  const [selectedStrategy, setSelectedStrategy] = useState<string>("1H");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [recommendation, setRecommendation] = useState<TradingRecommendation | null>(null);
   const [historicalData, setHistoricalData] = useState<any[]>([]);
+  const [historical4hData, setHistorical4hData] = useState<any[]>([]);
+  const [currentStrategy, setCurrentStrategy] = useState<string>("1H");
   const [showRawData, setShowRawData] = useState(false);
   const [analysisInputData, setAnalysisInputData] = useState<any>(null);
   const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
@@ -396,16 +400,20 @@ export function TradingDashboard() {
 
     setIsAnalyzing(true);
     try {
-      // Fetch historical data from Twelve API
-      const data = await fetchMarketData(selectedPair);
+      // Get market data
+      const data = await fetchMarketData(selectedPair, selectedStrategy);
       setMarketData(data.currentData);
       setHistoricalData(data.historicalData);
+      setHistorical4hData(data.historical4hData || []);
+      setCurrentStrategy(data.strategy || selectedStrategy);
 
       // Get AI analysis
       const analysis = await analyzeTradingOpportunity(
         selectedPair,
         data.historicalData,
-        data.currentData
+        data.currentData,
+        data.historical4hData,
+        selectedStrategy
       );
 
       // Check if AI analysis failed
@@ -427,7 +435,9 @@ export function TradingDashboard() {
         symbol: selectedPair,
         currentData: data.currentData,
         historicalData: data.historicalData,
-        technicalAnalysis: analysis.technicalAnalysis
+        historical4hData: data.historical4hData,
+        technicalAnalysis: analysis.technicalAnalysis,
+        strategy: analysis.strategy || selectedStrategy
       });
 
       // Save to Supabase only if analysis succeeded
@@ -475,7 +485,8 @@ export function TradingDashboard() {
           user_id: user.id,
           symbol: selectedPair,
           api_response: marketData,
-          ai_analysis: analysis
+          ai_analysis: analysis,
+          strategy_type: selectedStrategy
         });
 
       if (error) {
@@ -562,14 +573,19 @@ export function TradingDashboard() {
   const loadAnalysis = (savedAnalysis: SavedAnalysis) => {
     const { api_response, ai_analysis } = savedAnalysis;
     setSelectedPair(savedAnalysis.symbol);
+    setSelectedStrategy(savedAnalysis.strategy_type || '1H');
+    setCurrentStrategy(savedAnalysis.strategy_type || '1H');
     setMarketData(api_response.currentData);
     setHistoricalData(api_response.historicalData);
+    setHistorical4hData(api_response.historical4hData || []);
     setRecommendation(ai_analysis.recommendation);
     setAnalysisInputData({
       symbol: savedAnalysis.symbol,
       currentData: api_response.currentData,
       historicalData: api_response.historicalData,
-      technicalAnalysis: ai_analysis.technicalAnalysis
+      historical4hData: api_response.historical4hData,
+      technicalAnalysis: ai_analysis.technicalAnalysis,
+      strategy: savedAnalysis.strategy_type || '1H'
     });
   };
 
@@ -634,6 +650,28 @@ export function TradingDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex-1 max-w-xs">
+                    <label className="text-sm font-medium mb-2 block">Analysis Strategy</label>
+                    <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select strategy" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1H">
+                          <div className="flex flex-col">
+                            <span>1H Strategy</span>
+                            <span className="text-xs text-muted-foreground">Standard (48x 1H candles)</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="1H+4H">
+                          <div className="flex flex-col">
+                            <span>1H+4H Strategy</span>
+                            <span className="text-xs text-muted-foreground">Enhanced (48x 1H + 12x 4H candles)</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button 
                     onClick={analyzeMarket} 
                     disabled={!selectedPair || isAnalyzing}
@@ -676,17 +714,23 @@ export function TradingDashboard() {
                          key={analysis.id}
                          className="flex items-center justify-between p-4 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
                        >
-                         <div className="flex items-center gap-4 flex-1">
-                           <Badge variant="outline" className="font-mono">{analysis.symbol}</Badge>
-                           
-                           <div className="text-sm flex-1">
-                             <p className="font-medium">
-                               {analysis.ai_analysis.recommendation.action} - {analysis.ai_analysis.recommendation.confidence}% confidence
-                             </p>
-                             <p className="text-muted-foreground">
-                               {new Date(analysis.created_at).toLocaleString()}
-                             </p>
-                           </div>
+                          <div className="flex items-center gap-4 flex-1">
+                            <Badge variant="outline" className="font-mono">{analysis.symbol}</Badge>
+                            <Badge 
+                              variant={analysis.strategy_type === '1H+4H' ? 'default' : 'secondary'} 
+                              className="text-xs"
+                            >
+                              {analysis.strategy_type || '1H'}
+                            </Badge>
+                            
+                            <div className="text-sm flex-1">
+                              <p className="font-medium">
+                                {analysis.ai_analysis.recommendation.action} - {analysis.ai_analysis.recommendation.confidence}% confidence
+                              </p>
+                              <p className="text-muted-foreground">
+                                {new Date(analysis.created_at).toLocaleString()}
+                              </p>
+                            </div>
                            
                            {/* Session Information */}
                            <div className="flex items-center gap-2">
@@ -857,6 +901,12 @@ export function TradingDashboard() {
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5" />
                 AI Trading Recommendation
+                <Badge 
+                  variant={currentStrategy === '1H+4H' ? 'default' : 'secondary'} 
+                  className="ml-auto"
+                >
+                  {currentStrategy} Strategy
+                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1028,6 +1078,36 @@ export function TradingDashboard() {
                     {JSON.stringify(analysisInputData.historicalData, null, 2)}
                   </pre>
                 </div>
+                
+                {analysisInputData.historical4hData && analysisInputData.historical4hData.length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h4 className="font-semibold mb-2">4H Historical Data ({analysisInputData.historical4hData?.length || 0} candles)</h4>
+                      <pre className="bg-muted p-3 rounded text-sm overflow-x-auto max-h-64">
+                        {JSON.stringify(analysisInputData.historical4hData, null, 2)}
+                      </pre>
+                    </div>
+                  </>
+                )}
+                
+                {analysisInputData.strategy && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h4 className="font-semibold mb-2">Strategy Used</h4>
+                      <Badge variant={analysisInputData.strategy === '1H+4H' ? 'default' : 'secondary'}>
+                        {analysisInputData.strategy} Strategy
+                      </Badge>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {analysisInputData.strategy === '1H+4H' 
+                          ? 'Enhanced multi-timeframe analysis using both 1H and 4H data points'
+                          : 'Standard analysis using 1H timeframe data only'
+                        }
+                      </p>
+                    </div>
+                  </>
+                )}
               </CardContent>
             )}
           </Card>

@@ -16,11 +16,29 @@ serve(async (req) => {
   }
 
   try {
-    const { symbol, historicalData, currentData } = await req.json();
+    const { symbol, historicalData, currentData, historical4hData = null, strategy = '1H' } = await req.json();
 
     // Calculate technical indicators and trend analysis
-    const technicalAnalysis = calculateTechnicalIndicators(historicalData);
-    const trendAnalysis = analyzeTrend(historicalData);
+    let technicalAnalysis, trendAnalysis, technicalAnalysis4h = null, trendAnalysis4h = null;
+    
+    if (strategy === '1H+4H' && historical4hData) {
+      // Calculate for both timeframes
+      technicalAnalysis = calculateTechnicalIndicators(historicalData);
+      trendAnalysis = analyzeTrend(historicalData);
+      technicalAnalysis4h = calculateTechnicalIndicators(historical4hData);
+      trendAnalysis4h = analyzeTrend(historical4hData);
+      
+      // Merge analyses for multi-timeframe confidence
+      technicalAnalysis.multiTimeframe = {
+        confluence: calculateTimeframeConfluence(technicalAnalysis, technicalAnalysis4h),
+        higher4h: technicalAnalysis4h,
+        agreement: checkTrendAgreement(trendAnalysis, trendAnalysis4h)
+      };
+    } else {
+      // Original 1H strategy
+      technicalAnalysis = calculateTechnicalIndicators(historicalData);
+      trendAnalysis = analyzeTrend(historicalData);
+    }
     
     // Get current Romania time and market session info
     const romaniaTime = new Date();
@@ -36,7 +54,9 @@ serve(async (req) => {
         technicalAnalysis,
         trendAnalysis,
         marketSession,
-        romaniaTime
+        romaniaTime,
+        strategy,
+        historical4hData
       );
     } catch (aiError) {
       console.log('AI analysis failed:', aiError.message);
@@ -59,6 +79,7 @@ serve(async (req) => {
       JSON.stringify({
         recommendation,
         technicalAnalysis,
+        strategy,
         success: true,
       }),
       {
@@ -79,3 +100,44 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper functions for multi-timeframe analysis
+function calculateTimeframeConfluence(ta1h: any, ta4h: any): number {
+  let confluenceScore = 0;
+  let totalChecks = 0;
+  
+  // RSI confluence (both in same zone)
+  if ((ta1h.rsi < 30 && ta4h.rsi < 40) || (ta1h.rsi > 70 && ta4h.rsi > 60)) {
+    confluenceScore += 20;
+  }
+  totalChecks += 20;
+  
+  // SMA alignment confluence
+  if ((ta1h.sma10 > ta1h.sma20 && ta4h.sma10 > ta4h.sma20) || 
+      (ta1h.sma10 < ta1h.sma20 && ta4h.sma10 < ta4h.sma20)) {
+    confluenceScore += 25;
+  }
+  totalChecks += 25;
+  
+  // Support/Resistance proximity (within 0.5%)
+  const supportDiff = Math.abs(ta1h.support - ta4h.support) / ta1h.support;
+  const resistanceDiff = Math.abs(ta1h.resistance - ta4h.resistance) / ta1h.resistance;
+  
+  if (supportDiff < 0.005) confluenceScore += 15;
+  if (resistanceDiff < 0.005) confluenceScore += 15;
+  totalChecks += 30;
+  
+  // Bollinger Band alignment
+  if ((ta1h.bollinger && ta4h.bollinger)) {
+    const bb1hPos = ta1h.bollinger.position || 'middle';
+    const bb4hPos = ta4h.bollinger.position || 'middle';
+    if (bb1hPos === bb4hPos) confluenceScore += 25;
+  }
+  totalChecks += 25;
+  
+  return Math.round((confluenceScore / totalChecks) * 100);
+}
+
+function checkTrendAgreement(trend1h: any, trend4h: any): boolean {
+  return trend1h.overallTrend === trend4h.overallTrend;
+}

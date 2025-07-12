@@ -20,6 +20,7 @@ export type Database = {
           api_response: Json
           created_at: string
           id: string
+          strategy_type: string
           symbol: string
           updated_at: string
           user_id: string | null
@@ -29,6 +30,7 @@ export type Database = {
           api_response: Json
           created_at?: string
           id?: string
+          strategy_type?: string
           symbol: string
           updated_at?: string
           user_id?: string | null
@@ -38,6 +40,7 @@ export type Database = {
           api_response?: Json
           created_at?: string
           id?: string
+          strategy_type?: string
           symbol?: string
           updated_at?: string
           user_id?: string | null
