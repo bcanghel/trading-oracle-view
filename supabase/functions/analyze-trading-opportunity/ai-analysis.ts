@@ -112,7 +112,7 @@ Provide a JSON response with this EXACT structure:
   "support": "number - key support level you identify",
   "resistance": "number - key resistance level you identify", 
   "reasoning": "detailed explanation of your decision",
-  "riskReward": "number - your calculated risk to reward ratio",
+  "riskReward": "number - your calculated risk to reward ratio (MINIMUM 1:1.5 - do not suggest trades below this)",
   "entryConditions": "string - specific trigger conditions for entry",
   "entryTiming": "string - timing guidance and session considerations",
   "volumeConfirmation": "string - volume requirements for entry",
