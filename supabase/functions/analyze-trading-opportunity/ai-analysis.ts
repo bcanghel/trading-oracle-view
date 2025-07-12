@@ -104,7 +104,7 @@ MARKET SESSION:
 
 Provide a JSON response with this EXACT structure:
 {
-  "action": "BUY, SELL, or HOLD",
+  "action": "BUY or SELL (HOLD is not allowed - you must choose one)",
   "confidence": "integer from 10-95 based on your analysis",
   "entry": "number - your predicted FUTURE entry level (NOT current price - should be at key support/resistance/technical level)",
   "stopLoss": "number - your stop loss level",
