@@ -159,18 +159,35 @@ export function AutoTradingPanel() {
 
     setIsGeneratingTrade(true);
     const currentHour = getRomaniaHour();
+    const currentMinute = parseInt(new Date().toLocaleString('en-US', {
+      timeZone: 'Europe/Bucharest',
+      minute: '2-digit'
+    }));
     
-    // Find if we're at a session start time
-    const activeSession = SESSION_CONFIGS.find(session => session.startHour === currentHour);
+    // Generate trades within first 15 minutes of session start
+    const activeSession = SESSION_CONFIGS.find(session => 
+      session.startHour === currentHour && currentMinute <= 15
+    );
     
     if (activeSession) {
       console.log(`Generating trades for ${activeSession.name}`);
       
-      for (const symbol of activeSession.pairs) {
-        await generateTradeForPair(symbol, activeSession.name);
-      }
+      // Check if we already have trades for this session today
+      const today = new Date().toISOString().split('T')[0];
+      const { data: existingTrades } = await supabase
+        .from('auto_trades')
+        .select('id')
+        .eq('session_name', activeSession.name)
+        .gte('created_at', today + 'T00:00:00.000Z')
+        .lt('created_at', today + 'T23:59:59.999Z');
       
-      await loadTrades();
+      if (!existingTrades || existingTrades.length === 0) {
+        for (const symbol of activeSession.pairs) {
+          await generateTradeForPair(symbol, activeSession.name);
+        }
+        
+        await loadTrades();
+      }
     }
     
     setIsGeneratingTrade(false);
