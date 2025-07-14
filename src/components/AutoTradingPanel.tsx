@@ -54,7 +54,10 @@ const SESSION_CONFIGS: SessionConfig[] = [
 
 export function AutoTradingPanel() {
   const { toast } = useToast();
-  const [isAutoTradingEnabled, setIsAutoTradingEnabled] = useState(false);
+  const [isAutoTradingEnabled, setIsAutoTradingEnabled] = useState(() => {
+    const saved = localStorage.getItem('autoTradingEnabled');
+    return saved ? JSON.parse(saved) : false;
+  });
   const [activeTrades, setActiveTrades] = useState<AutoTrade[]>([]);
   const [completedTrades, setCompletedTrades] = useState<AutoTrade[]>([]);
   const [isGeneratingTrade, setIsGeneratingTrade] = useState(false);
@@ -326,7 +329,10 @@ export function AutoTradingPanel() {
               <Switch
                 id="auto-trading"
                 checked={isAutoTradingEnabled}
-                onCheckedChange={setIsAutoTradingEnabled}
+                onCheckedChange={(checked) => {
+                  setIsAutoTradingEnabled(checked);
+                  localStorage.setItem('autoTradingEnabled', JSON.stringify(checked));
+                }}
               />
             </div>
           </CardTitle>
