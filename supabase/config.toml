@@ -1,1 +1,10 @@
 project_id = "cgmzxonyaiwtcyxmmhsi"
+
+[functions.analyze-trading-opportunity]
+verify_jwt = false
+
+[functions.fetch-market-data]
+verify_jwt = false
+
+[functions.auto-trading-scheduler]
+verify_jwt = false
