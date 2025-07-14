@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      auto_trades: {
+        Row: {
+          action: string
+          closed_at: string | null
+          created_at: string
+          entry_price: number
+          id: string
+          next_check_at: string | null
+          pips_result: number | null
+          session_name: string
+          status: string
+          stop_loss: number
+          symbol: string
+          take_profit: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          closed_at?: string | null
+          created_at?: string
+          entry_price: number
+          id?: string
+          next_check_at?: string | null
+          pips_result?: number | null
+          session_name: string
+          status?: string
+          stop_loss: number
+          symbol: string
+          take_profit: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          closed_at?: string | null
+          created_at?: string
+          entry_price?: number
+          id?: string
+          next_check_at?: string | null
+          pips_result?: number | null
+          session_name?: string
+          status?: string
+          stop_loss?: number
+          symbol?: string
+          take_profit?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       trade_analyses: {
         Row: {
           ai_analysis: Json

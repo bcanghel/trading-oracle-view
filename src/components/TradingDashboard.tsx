@@ -12,6 +12,7 @@ import { fetchMarketData, analyzeTradingOpportunity } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import UserMenu from "@/components/UserMenu";
 import { MarketSessions } from "@/components/MarketSessions";
+import { AutoTradingPanel } from "@/components/AutoTradingPanel";
 
 interface TradingRecommendation {
   action: 'BUY' | 'SELL';
@@ -613,10 +614,14 @@ export function TradingDashboard() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="analysis" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="analysis" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Market Analysis
+            </TabsTrigger>
+            <TabsTrigger value="auto-trading" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Auto Trading
             </TabsTrigger>
             <TabsTrigger value="sessions" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
@@ -1112,6 +1117,10 @@ export function TradingDashboard() {
             )}
           </Card>
         )}
+          </TabsContent>
+
+          <TabsContent value="auto-trading">
+            <AutoTradingPanel />
           </TabsContent>
 
           <TabsContent value="sessions">
