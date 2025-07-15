@@ -292,10 +292,14 @@ serve(async (req) => {
         console.log('Manual test mode - generating New York session trades');
         const testSession = SESSION_CONFIGS.find(s => s.name === 'New York Session');
         if (testSession) {
-          console.log(`Generating test trades for ${testSession.name}`);
+          console.log(`Generating test trades for ${testSession.name} with pairs: ${testSession.pairs.join(', ')}`);
+          const results = [];
           for (const symbol of testSession.pairs) {
-            await generateTradeForPair(symbol, testSession.name);
+            console.log(`Starting trade generation for ${symbol}`);
+            const trade = await generateTradeForPair(symbol, testSession.name);
+            results.push({ symbol, trade: trade ? 'success' : 'failed' });
           }
+          console.log('Test results:', results);
         }
         return;
       }
