@@ -147,43 +147,56 @@ Format: {"action": "BUY/SELL", "entry": number, "stopLoss": number, "takeProfit"
         console.log(`Generating trade for ${symbol} - ${sessionName}`);
         
         const marketData = await fetchMarketData(symbol);
+        console.log(`Got market data for ${symbol}`);
+        
         const analysis = await getAIAnalysis(symbol, marketData.historicalData, marketData.currentData);
+        console.log(`Got analysis for ${symbol}:`, analysis);
         
         if (!analysis || analysis.confidence < 6) {
           console.log(`Skipping ${symbol}: Low confidence or invalid analysis`);
           return null;
         }
 
-        // Get all users who have auto-trading enabled (we'll assume all users for now)
-        const { data: users } = await supabase.auth.admin.listUsers();
+        // For now, create trades for the authenticated user making the request
+        // In production, you might want to get all users who have auto-trading enabled
+        const authHeader = Deno.env.get('_SUPABASE_AUTH');
+        let userId = 'b195e363-8000-4440-9632-f9af83eb0e8c'; // Your user ID as fallback
         
-        for (const user of users.users) {
-          const nextCheck = new Date();
-          nextCheck.setHours(nextCheck.getHours() + 3);
-
-          const { data: trade, error } = await supabase
-            .from('auto_trades')
-            .insert({
-              symbol,
-              action: analysis.action,
-              entry_price: analysis.entry,
-              stop_loss: analysis.stopLoss,
-              take_profit: analysis.takeProfit,
-              session_name: sessionName,
-              next_check_at: nextCheck.toISOString(),
-              user_id: user.id
-            })
-            .select()
-            .single();
-
-          if (error) {
-            console.error(`Failed to create trade for user ${user.id}:`, error);
-          } else {
-            console.log(`Created trade ${trade.id} for ${symbol} - ${sessionName} for user ${user.id}`);
+        if (authHeader) {
+          try {
+            const payload = JSON.parse(atob(authHeader.split(' ')[1].split('.')[1]));
+            userId = payload.sub;
+            console.log(`Using authenticated user: ${userId}`);
+          } catch (e) {
+            console.log('Could not parse auth header, using fallback user ID');
           }
         }
-        
-        return analysis;
+
+        const nextCheck = new Date();
+        nextCheck.setHours(nextCheck.getHours() + 3);
+
+        const { data: trade, error } = await supabase
+          .from('auto_trades')
+          .insert({
+            symbol,
+            action: analysis.action,
+            entry_price: analysis.entry,
+            stop_loss: analysis.stopLoss,
+            take_profit: analysis.takeProfit,
+            session_name: sessionName,
+            next_check_at: nextCheck.toISOString(),
+            user_id: userId
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error(`Failed to create trade:`, error);
+          return null;
+        } else {
+          console.log(`Created trade ${trade.id} for ${symbol} - ${sessionName}`);
+          return trade;
+        }
       } catch (error) {
         console.error(`Failed to generate trade for ${symbol}:`, error);
         return null;
