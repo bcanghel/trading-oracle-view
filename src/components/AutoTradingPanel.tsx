@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { TrendingUp, TrendingDown, Clock, Target, AlertTriangle, Play, Pause } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { fetchMarketData, analyzeTradingOpportunity } from "@/lib/api";
+import { fetchMarketData, analyzeTradingOpportunity, testAutoTradingScheduler } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 
 interface AutoTrade {
@@ -338,6 +338,34 @@ export function AutoTradingPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <Button 
+              onClick={async () => {
+                try {
+                  setIsGeneratingTrade(true);
+                  const result = await testAutoTradingScheduler();
+                  toast({
+                    title: "Test Complete",
+                    description: `Auto trading scheduler test: ${result.success ? 'Success' : 'Failed'}`,
+                    variant: result.success ? "default" : "destructive"
+                  });
+                  await loadTrades();
+                } catch (error) {
+                  toast({
+                    title: "Test Failed", 
+                    description: error.message,
+                    variant: "destructive"
+                  });
+                } finally {
+                  setIsGeneratingTrade(false);
+                }
+              }}
+              disabled={isGeneratingTrade}
+              size="sm"
+            >
+              {isGeneratingTrade ? "Testing..." : "Test Auto Trading Now"}
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-primary">{totalPips}</div>
