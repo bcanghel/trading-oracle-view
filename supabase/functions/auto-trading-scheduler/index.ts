@@ -269,6 +269,20 @@ Format: {"action": "BUY/SELL", "entry": number, "stopLoss": number, "takeProfit"
       
       console.log(`Current time: ${currentHour}:${currentMinute} Romania time`);
       
+      // For testing: force generation of New York session trades
+      const testBody = await req.json();
+      if (testBody?.time === 'manual_test') {
+        console.log('Manual test mode - generating New York session trades');
+        const testSession = SESSION_CONFIGS.find(s => s.name === 'New York Session');
+        if (testSession) {
+          console.log(`Generating test trades for ${testSession.name}`);
+          for (const symbol of testSession.pairs) {
+            await generateTradeForPair(symbol, testSession.name);
+          }
+        }
+        return;
+      }
+      
       // Generate trades within first 15 minutes of session start
       const activeSession = SESSION_CONFIGS.find(session => 
         session.startHour === currentHour && currentMinute <= 15
@@ -295,6 +309,8 @@ Format: {"action": "BUY/SELL", "entry": number, "stopLoss": number, "takeProfit"
         } else {
           console.log(`Trades already exist for ${activeSession.name} today`);
         }
+      } else {
+        console.log(`No active session found for hour ${currentHour}`);
       }
     };
 
