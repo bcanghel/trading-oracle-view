@@ -86,60 +86,64 @@ serve(async (req) => {
     };
 
     const getAIAnalysis = async (symbol: string, historicalData: any[], currentData: any) => {
-      const prompt = `Analyze ${symbol} forex pair for trading opportunity.
-
-Historical data (last 20 periods):
-${historicalData.slice(0, 20).map(d => `${d.datetime}: O=${d.open} H=${d.high} L=${d.low} C=${d.close}`).join('\n')}
-
-Current price: ${currentData.price}
-
-Provide analysis with MINIMUM 1:1.5 risk/reward ratio:
-- Action: BUY or SELL
-- Entry price
-- Stop loss 
-- Take profit
-- Confidence (1-10)
-- Brief reasoning
-
-Format: {"action": "BUY/SELL", "entry": number, "stopLoss": number, "takeProfit": number, "confidence": number, "reasoning": "text"}`;
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Use the same advanced analysis as the Market Analysis tab
+      const analysisResponse = await fetch('https://cgmzxonyaiwtcyxmmhsi.supabase.co/functions/v1/analyze-trading-opportunity', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'You are an expert forex analyst. Always ensure risk/reward ratio is at least 1:1.5. Return only valid JSON.' },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.3,
+          symbol,
+          historicalData,
+          currentData: {
+            currentPrice: currentData.price,
+            changePercent: 0,
+            high24h: Math.max(...historicalData.slice(0, 24).map(d => parseFloat(d.high))),
+            low24h: Math.min(...historicalData.slice(0, 24).map(d => parseFloat(d.low))),
+          },
+          strategy: '1H'
         }),
       });
 
-      const aiData = await response.json();
-      const aiResponse = aiData.choices[0].message.content;
-      
-      try {
-        const analysis = JSON.parse(aiResponse);
-        
-        // Validate minimum R/R ratio
-        const riskPoints = Math.abs(analysis.entry - analysis.stopLoss);
-        const rewardPoints = Math.abs(analysis.takeProfit - analysis.entry);
-        const rrRatio = rewardPoints / riskPoints;
-        
-        if (rrRatio < 1.5) {
-          console.log(`Rejecting ${symbol} trade: R/R ratio ${rrRatio.toFixed(2)} is below 1:1.5 minimum`);
-          return null;
-        }
-        
-        return analysis;
-      } catch (error) {
-        console.error('Failed to parse AI response:', aiResponse);
+      if (!analysisResponse.ok) {
+        console.error('Failed to get trading analysis:', await analysisResponse.text());
         return null;
       }
+
+      const analysisData = await analysisResponse.json();
+      
+      if (!analysisData.success) {
+        console.error('Trading analysis failed:', analysisData.error);
+        return null;
+      }
+
+      const recommendation = analysisData.recommendation;
+      
+      // Validate confidence threshold (use 70+ instead of 6+ for auto-trading)
+      if (!recommendation || recommendation.confidence < 70) {
+        console.log(`Skipping ${symbol}: Low confidence ${recommendation?.confidence || 0}%`);
+        return null;
+      }
+
+      // Validate minimum R/R ratio
+      const riskPoints = Math.abs(recommendation.entry - recommendation.stopLoss);
+      const rewardPoints = Math.abs(recommendation.takeProfit - recommendation.entry);
+      const rrRatio = rewardPoints / riskPoints;
+      
+      if (rrRatio < 1.5) {
+        console.log(`Rejecting ${symbol} trade: R/R ratio ${rrRatio.toFixed(2)} is below 1:1.5 minimum`);
+        return null;
+      }
+
+      return {
+        action: recommendation.action,
+        entry: recommendation.entry,
+        stopLoss: recommendation.stopLoss,
+        takeProfit: recommendation.takeProfit,
+        confidence: recommendation.confidence,
+        reasoning: recommendation.reasoning
+      };
     };
 
     const generateTradeForPair = async (symbol: string, sessionName: string) => {
@@ -152,8 +156,8 @@ Format: {"action": "BUY/SELL", "entry": number, "stopLoss": number, "takeProfit"
         const analysis = await getAIAnalysis(symbol, marketData.historicalData, marketData.currentData);
         console.log(`Got analysis for ${symbol}:`, analysis);
         
-        if (!analysis || analysis.confidence < 6) {
-          console.log(`Skipping ${symbol}: Low confidence or invalid analysis`);
+        if (!analysis) {
+          console.log(`Skipping ${symbol}: No valid analysis returned`);
           return null;
         }
 
