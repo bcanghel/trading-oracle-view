@@ -165,10 +165,18 @@ serve(async (req) => {
         console.log(`Generating trade for ${symbol} - ${sessionName}`);
         
         const marketData = await fetchMarketData(symbol);
-        console.log(`Got market data for ${symbol}`);
+        console.log(`Got market data for ${symbol}:`, {
+          price: marketData.currentData.price,
+          strategy: marketData.strategy,
+          has4hData: marketData.historical4hData?.length > 0
+        });
         
         const analysis = await getAIAnalysis(symbol, marketData.historicalData, marketData.currentData, marketData.historical4hData);
-        console.log(`Got analysis for ${symbol}:`, analysis);
+        console.log(`Got analysis for ${symbol}:`, analysis ? {
+          action: analysis.action,
+          confidence: analysis.confidence,
+          riskReward: analysis.riskReward
+        } : 'null');
         
         if (!analysis) {
           console.log(`Skipping ${symbol}: No valid analysis returned`);
@@ -177,12 +185,13 @@ serve(async (req) => {
 
         // For now, create trades for the authenticated user making the request
         // In production, you might want to get all users who have auto-trading enabled
-        const authHeader = Deno.env.get('_SUPABASE_AUTH');
+        const authHeader = req.headers.get('authorization');
         let userId = 'b195e363-8000-4440-9632-f9af83eb0e8c'; // Your user ID as fallback
         
         if (authHeader) {
           try {
-            const payload = JSON.parse(atob(authHeader.split(' ')[1].split('.')[1]));
+            const token = authHeader.replace('Bearer ', '');
+            const payload = JSON.parse(atob(token.split('.')[1]));
             userId = payload.sub;
             console.log(`Using authenticated user: ${userId}`);
           } catch (e) {
@@ -193,6 +202,8 @@ serve(async (req) => {
         const nextCheck = new Date();
         nextCheck.setHours(nextCheck.getHours() + 3);
 
+        console.log(`Attempting to create trade for ${symbol} with userId: ${userId}`);
+        
         const { data: trade, error } = await supabase
           .from('auto_trades')
           .insert({
