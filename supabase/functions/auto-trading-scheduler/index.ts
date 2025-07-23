@@ -42,7 +42,9 @@ serve(async (req) => {
     const twelveApiKey = Deno.env.get('TWELVE_API')!;
     const openAIApiKey = Deno.env.get('OPEN_AI_API')!;
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
+    });
 
     const getRomaniaHour = () => {
       return parseInt(new Date().toLocaleString('en-US', {
