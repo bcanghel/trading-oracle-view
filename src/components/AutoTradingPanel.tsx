@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, Clock, Target, AlertTriangle, Play, Pause } f
 import { useToast } from "@/hooks/use-toast";
 import { fetchMarketData, analyzeTradingOpportunity, testAutoTradingScheduler } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
+import { ResetAutoTrades } from "./ResetAutoTrades";
 
 interface AutoTrade {
   id: string;
@@ -338,7 +339,7 @@ export function AutoTradingPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-4">
+          <div className="mb-4 flex gap-2">
             <Button 
               onClick={async () => {
                 try {
@@ -365,6 +366,7 @@ export function AutoTradingPanel() {
             >
               {isGeneratingTrade ? "Testing..." : "Test Auto Trading Now"}
             </Button>
+            <ResetAutoTrades />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center">
