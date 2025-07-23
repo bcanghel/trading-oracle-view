@@ -133,10 +133,18 @@ serve(async (req) => {
       }
 
       const recommendation = analysisData.recommendation;
+      console.log(`AI Analysis for ${symbol}:`, {
+        confidence: recommendation?.confidence || 'N/A',
+        action: recommendation?.action || 'N/A',
+        entry: recommendation?.entry || 'N/A',
+        stopLoss: recommendation?.stopLoss || 'N/A',
+        takeProfit: recommendation?.takeProfit || 'N/A',
+        reasoning: recommendation?.reasoning || 'N/A'
+      });
       
-      // Validate confidence threshold (use 50+ for testing to allow more trades)
+      // Validate confidence threshold
       if (!recommendation || recommendation.confidence < 50) {
-        console.log(`Skipping ${symbol}: Low confidence ${recommendation?.confidence || 0}%`);
+        console.log(`❌ REJECTED ${symbol}: Low confidence ${recommendation?.confidence || 0}% (required: 50%+)`);
         return null;
       }
 
@@ -145,11 +153,20 @@ serve(async (req) => {
       const rewardPoints = Math.abs(recommendation.takeProfit - recommendation.entry);
       const rrRatio = rewardPoints / riskPoints;
       
+      console.log(`Risk/Reward Analysis for ${symbol}:`, {
+        riskPoints: riskPoints.toFixed(5),
+        rewardPoints: rewardPoints.toFixed(5),
+        rrRatio: rrRatio.toFixed(2),
+        required: '1.50+'
+      });
+      
       if (rrRatio < 1.5) {
-        console.log(`Rejecting ${symbol} trade: R/R ratio ${rrRatio.toFixed(2)} is below 1:1.5 minimum`);
+        console.log(`❌ REJECTED ${symbol}: Poor R/R ratio ${rrRatio.toFixed(2)} (required: 1.5+)`);
         return null;
       }
 
+      console.log(`✅ APPROVED ${symbol}: Confidence ${recommendation.confidence}%, R/R ${rrRatio.toFixed(2)}:1`);
+      
       return {
         action: recommendation.action,
         entry: recommendation.entry,
@@ -311,83 +328,40 @@ serve(async (req) => {
       
       console.log(`Current time: ${currentHour}:${currentMinute} Romania time`);
       
-      // For testing: force generation of New York session trades with relaxed criteria
+      // For testing: analyze trades but only create if they meet criteria
       const testBody = await req.json();
       if (testBody?.time === 'manual_test') {
-        console.log('Manual test mode - generating New York session trades with RELAXED criteria');
+        console.log('=== MANUAL TEST MODE - COMPREHENSIVE ANALYSIS LOGGING ===');
         const testSession = SESSION_CONFIGS.find(s => s.name === 'New York Session');
         if (testSession) {
-          console.log(`Generating test trades for ${testSession.name} with pairs: ${testSession.pairs.join(', ')}`);
+          console.log(`Testing analysis for ${testSession.name} with pairs: ${testSession.pairs.join(', ')}`);
           const results = [];
+          
           for (const symbol of testSession.pairs) {
-            console.log(`Starting FORCED trade generation for ${symbol}`);
-            
-            // Force create a trade even if analysis is weak
+            console.log(`\n--- ANALYZING ${symbol} ---`);
             try {
-              const marketData = await fetchMarketData(symbol);
-              console.log(`Got market data for ${symbol}:`, {
-                price: marketData.currentData.price,
-                strategy: marketData.strategy
-              });
-              
-              const analysis = await getAIAnalysis(symbol, marketData.historicalData, marketData.currentData, marketData.historical4hData);
-              console.log(`Got analysis for ${symbol}:`, analysis ? {
-                action: analysis.action,
-                confidence: analysis.confidence,
-                riskReward: analysis.riskReward || 'N/A'
-              } : 'null');
-              
-              // If no analysis or low confidence, create a basic trade anyway for testing
-              if (!analysis || analysis.confidence < 40) {
-                console.log(`Creating FALLBACK trade for ${symbol} due to weak/no analysis`);
-                const currentPrice = marketData.currentData.price;
-                const fallbackTrade = {
-                  action: 'BUY' as const,
-                  entry: currentPrice,
-                  stopLoss: currentPrice * 0.995, // 0.5% stop loss
-                  takeProfit: currentPrice * 1.01, // 1% take profit
-                  confidence: 50
-                };
-                
-                const authHeader = req.headers.get('authorization');
-                let userId = 'b195e363-8000-4440-9632-f9af83eb0e8c';
-                
-                const nextCheck = new Date();
-                nextCheck.setHours(nextCheck.getHours() + 3);
-
-                const { data: trade, error } = await supabase
-                  .from('auto_trades')
-                  .insert({
-                    symbol,
-                    action: fallbackTrade.action,
-                    entry_price: fallbackTrade.entry,
-                    stop_loss: fallbackTrade.stopLoss,
-                    take_profit: fallbackTrade.takeProfit,
-                    session_name: testSession.name,
-                    next_check_at: nextCheck.toISOString(),
-                    user_id: userId
-                  })
-                  .select()
-                  .single();
-                  
-                if (error) {
-                  console.error(`Failed to create fallback trade:`, error);
-                  results.push({ symbol, trade: 'failed', error: error.message });
-                } else {
-                  console.log(`Created FALLBACK trade ${trade.id} for ${symbol}`);
-                  results.push({ symbol, trade: 'fallback_success', id: trade.id });
-                }
+              const trade = await generateTradeForPair(symbol, testSession.name);
+              if (trade) {
+                results.push({ symbol, status: 'TRADE_CREATED', id: trade.id });
+                console.log(`✅ SUCCESS: Created trade for ${symbol}`);
               } else {
-                // Try with the normal analysis
-                const trade = await generateTradeForPair(symbol, testSession.name);
-                results.push({ symbol, trade: trade ? 'analysis_success' : 'analysis_failed' });
+                results.push({ symbol, status: 'REJECTED_BY_CRITERIA' });
+                console.log(`❌ REJECTED: ${symbol} did not meet trading criteria`);
               }
             } catch (error) {
-              console.error(`Error in forced trade generation for ${symbol}:`, error);
-              results.push({ symbol, trade: 'error', error: error.message });
+              console.error(`💥 ERROR analyzing ${symbol}:`, error);
+              results.push({ symbol, status: 'ERROR', error: error.message });
             }
           }
-          console.log('Test results:', results);
+          
+          console.log('\n=== FINAL TEST RESULTS ===');
+          console.log('Results summary:', results);
+          
+          const created = results.filter(r => r.status === 'TRADE_CREATED').length;
+          const rejected = results.filter(r => r.status === 'REJECTED_BY_CRITERIA').length;
+          const errors = results.filter(r => r.status === 'ERROR').length;
+          
+          console.log(`Trades created: ${created}, Rejected by criteria: ${rejected}, Errors: ${errors}`);
         }
         return;
       }
