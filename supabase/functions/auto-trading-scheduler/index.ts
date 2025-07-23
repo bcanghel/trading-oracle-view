@@ -311,18 +311,81 @@ serve(async (req) => {
       
       console.log(`Current time: ${currentHour}:${currentMinute} Romania time`);
       
-      // For testing: force generation of New York session trades
+      // For testing: force generation of New York session trades with relaxed criteria
       const testBody = await req.json();
       if (testBody?.time === 'manual_test') {
-        console.log('Manual test mode - generating New York session trades');
+        console.log('Manual test mode - generating New York session trades with RELAXED criteria');
         const testSession = SESSION_CONFIGS.find(s => s.name === 'New York Session');
         if (testSession) {
           console.log(`Generating test trades for ${testSession.name} with pairs: ${testSession.pairs.join(', ')}`);
           const results = [];
           for (const symbol of testSession.pairs) {
-            console.log(`Starting trade generation for ${symbol}`);
-            const trade = await generateTradeForPair(symbol, testSession.name);
-            results.push({ symbol, trade: trade ? 'success' : 'failed' });
+            console.log(`Starting FORCED trade generation for ${symbol}`);
+            
+            // Force create a trade even if analysis is weak
+            try {
+              const marketData = await fetchMarketData(symbol);
+              console.log(`Got market data for ${symbol}:`, {
+                price: marketData.currentData.price,
+                strategy: marketData.strategy
+              });
+              
+              const analysis = await getAIAnalysis(symbol, marketData.historicalData, marketData.currentData, marketData.historical4hData);
+              console.log(`Got analysis for ${symbol}:`, analysis ? {
+                action: analysis.action,
+                confidence: analysis.confidence,
+                riskReward: analysis.riskReward || 'N/A'
+              } : 'null');
+              
+              // If no analysis or low confidence, create a basic trade anyway for testing
+              if (!analysis || analysis.confidence < 40) {
+                console.log(`Creating FALLBACK trade for ${symbol} due to weak/no analysis`);
+                const currentPrice = marketData.currentData.price;
+                const fallbackTrade = {
+                  action: 'BUY' as const,
+                  entry: currentPrice,
+                  stopLoss: currentPrice * 0.995, // 0.5% stop loss
+                  takeProfit: currentPrice * 1.01, // 1% take profit
+                  confidence: 50
+                };
+                
+                const authHeader = req.headers.get('authorization');
+                let userId = 'b195e363-8000-4440-9632-f9af83eb0e8c';
+                
+                const nextCheck = new Date();
+                nextCheck.setHours(nextCheck.getHours() + 3);
+
+                const { data: trade, error } = await supabase
+                  .from('auto_trades')
+                  .insert({
+                    symbol,
+                    action: fallbackTrade.action,
+                    entry_price: fallbackTrade.entry,
+                    stop_loss: fallbackTrade.stopLoss,
+                    take_profit: fallbackTrade.takeProfit,
+                    session_name: testSession.name,
+                    next_check_at: nextCheck.toISOString(),
+                    user_id: userId
+                  })
+                  .select()
+                  .single();
+                  
+                if (error) {
+                  console.error(`Failed to create fallback trade:`, error);
+                  results.push({ symbol, trade: 'failed', error: error.message });
+                } else {
+                  console.log(`Created FALLBACK trade ${trade.id} for ${symbol}`);
+                  results.push({ symbol, trade: 'fallback_success', id: trade.id });
+                }
+              } else {
+                // Try with the normal analysis
+                const trade = await generateTradeForPair(symbol, testSession.name);
+                results.push({ symbol, trade: trade ? 'analysis_success' : 'analysis_failed' });
+              }
+            } catch (error) {
+              console.error(`Error in forced trade generation for ${symbol}:`, error);
+              results.push({ symbol, trade: 'error', error: error.message });
+            }
           }
           console.log('Test results:', results);
         }
