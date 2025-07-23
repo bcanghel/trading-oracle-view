@@ -120,8 +120,8 @@ serve(async (req) => {
 
       const recommendation = analysisData.recommendation;
       
-      // Validate confidence threshold (use 70+ instead of 6+ for auto-trading)
-      if (!recommendation || recommendation.confidence < 70) {
+      // Validate confidence threshold (use 60+ for auto-trading to allow more trades)
+      if (!recommendation || recommendation.confidence < 60) {
         console.log(`Skipping ${symbol}: Low confidence ${recommendation?.confidence || 0}%`);
         return null;
       }
