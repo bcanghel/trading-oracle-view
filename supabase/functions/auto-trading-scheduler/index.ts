@@ -66,27 +66,38 @@ serve(async (req) => {
     };
 
     const fetchMarketData = async (symbol: string) => {
-      const response = await fetch(
+      // Get both 1H and 4H data for comprehensive analysis (same as Market Analysis tab)
+      const response1h = await fetch(
         `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1h&apikey=${twelveApiKey}&outputsize=100`
       );
-      const data = await response.json();
+      const data1h = await response1h.json();
       
-      if (!data.values || data.values.length === 0) {
-        throw new Error(`No market data for ${symbol}`);
+      const response4h = await fetch(
+        `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=4h&apikey=${twelveApiKey}&outputsize=50`
+      );
+      const data4h = await response4h.json();
+      
+      if (!data1h.values || data1h.values.length === 0) {
+        throw new Error(`No 1H market data for ${symbol}`);
       }
 
-      const latest = data.values[0];
+      const latest = data1h.values[0];
       return {
-        historicalData: data.values,
+        historicalData: data1h.values,
+        historical4hData: data4h.values || [],
         currentData: {
           price: parseFloat(latest.close),
-          timestamp: latest.datetime
-        }
+          timestamp: latest.datetime,
+          high24h: Math.max(...data1h.values.slice(0, 24).map(d => parseFloat(d.high))),
+          low24h: Math.min(...data1h.values.slice(0, 24).map(d => parseFloat(d.low))),
+          changePercent: 0
+        },
+        strategy: '1H+4H' // Multi-timeframe strategy like Market Analysis
       };
     };
 
-    const getAIAnalysis = async (symbol: string, historicalData: any[], currentData: any) => {
-      // Use the same advanced analysis as the Market Analysis tab
+    const getAIAnalysis = async (symbol: string, historicalData: any[], currentData: any, historical4hData: any[]) => {
+      // Use the same advanced analysis as the Market Analysis tab with multi-timeframe data
       const analysisResponse = await fetch('https://cgmzxonyaiwtcyxmmhsi.supabase.co/functions/v1/analyze-trading-opportunity', {
         method: 'POST',
         headers: {
@@ -98,11 +109,12 @@ serve(async (req) => {
           historicalData,
           currentData: {
             currentPrice: currentData.price,
-            changePercent: 0,
-            high24h: Math.max(...historicalData.slice(0, 24).map(d => parseFloat(d.high))),
-            low24h: Math.min(...historicalData.slice(0, 24).map(d => parseFloat(d.low))),
+            changePercent: currentData.changePercent || 0,
+            high24h: currentData.high24h,
+            low24h: currentData.low24h,
           },
-          strategy: '1H'
+          historical4hData, // Include 4H data for comprehensive analysis
+          strategy: '1H+4H' // Multi-timeframe strategy like Market Analysis tab
         }),
       });
 
@@ -153,7 +165,7 @@ serve(async (req) => {
         const marketData = await fetchMarketData(symbol);
         console.log(`Got market data for ${symbol}`);
         
-        const analysis = await getAIAnalysis(symbol, marketData.historicalData, marketData.currentData);
+        const analysis = await getAIAnalysis(symbol, marketData.historicalData, marketData.currentData, marketData.historical4hData);
         console.log(`Got analysis for ${symbol}:`, analysis);
         
         if (!analysis) {
