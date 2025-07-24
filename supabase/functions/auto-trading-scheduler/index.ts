@@ -122,14 +122,14 @@ serve(async (req) => {
 
       if (!analysisResponse.ok) {
         console.error('Failed to get trading analysis:', await analysisResponse.text());
-        return null;
+        return { error: 'API request failed', response: null };
       }
 
       const analysisData = await analysisResponse.json();
       
       if (!analysisData.success) {
         console.error('Trading analysis failed:', analysisData.error);
-        return null;
+        return { error: 'Analysis failed', response: null };
       }
 
       const recommendation = analysisData.recommendation;
@@ -141,14 +141,12 @@ serve(async (req) => {
         takeProfit: recommendation?.takeProfit || 'N/A',
         reasoning: recommendation?.reasoning || 'N/A'
       });
-      
-      // Validate confidence threshold
-      if (!recommendation || recommendation.confidence < 50) {
-        console.log(`❌ REJECTED ${symbol}: Low confidence ${recommendation?.confidence || 0}% (required: 50%+)`);
-        return null;
+
+      if (!recommendation) {
+        return { error: 'No recommendation returned', response: null };
       }
 
-      // Validate minimum R/R ratio
+      // Calculate R/R ratio for all trades
       const riskPoints = Math.abs(recommendation.entry - recommendation.stopLoss);
       const rewardPoints = Math.abs(recommendation.takeProfit - recommendation.entry);
       const rrRatio = rewardPoints / riskPoints;
@@ -159,22 +157,31 @@ serve(async (req) => {
         rrRatio: rrRatio.toFixed(2),
         required: '1.50+'
       });
-      
-      if (rrRatio < 1.5) {
-        console.log(`❌ REJECTED ${symbol}: Poor R/R ratio ${rrRatio.toFixed(2)} (required: 1.5+)`);
-        return null;
-      }
 
-      console.log(`✅ APPROVED ${symbol}: Confidence ${recommendation.confidence}%, R/R ${rrRatio.toFixed(2)}:1`);
-      
-      return {
+      // Return analysis with all data, including rejection reasons
+      const result = {
         action: recommendation.action,
         entry: recommendation.entry,
         stopLoss: recommendation.stopLoss,
         takeProfit: recommendation.takeProfit,
         confidence: recommendation.confidence,
-        reasoning: recommendation.reasoning
+        reasoning: recommendation.reasoning,
+        rrRatio: rrRatio,
+        error: null
       };
+
+      // Check validation criteria but don't return null anymore
+      if (recommendation.confidence < 50) {
+        result.error = `Low confidence ${recommendation.confidence}% (required: 50%+)`;
+        console.log(`❌ REJECTED ${symbol}: ${result.error}`);
+      } else if (rrRatio < 1.5) {
+        result.error = `Poor R/R ratio ${rrRatio.toFixed(2)} (required: 1.5+)`;
+        console.log(`❌ REJECTED ${symbol}: ${result.error}`);
+      } else {
+        console.log(`✅ APPROVED ${symbol}: Confidence ${recommendation.confidence}%, R/R ${rrRatio.toFixed(2)}:1`);
+      }
+      
+      return result;
     };
 
     const generateTradeForPair = async (symbol: string, sessionName: string) => {
@@ -195,9 +202,16 @@ serve(async (req) => {
           riskReward: analysis.riskReward
         } : 'null');
         
-        if (!analysis) {
-          console.log(`Skipping ${symbol}: No valid analysis returned`);
-          return null;
+        // Store ALL trade attempts, including rejected ones
+        let rejectionReason = null;
+        let tradeStatus = 'OPEN';
+        
+        if (!analysis || analysis.error) {
+          rejectionReason = analysis?.error || 'AI analysis failed or returned null';
+          tradeStatus = 'REJECTED';
+          console.log(`REJECTED ${symbol}: ${rejectionReason}`);
+        } else {
+          console.log(`APPROVED ${symbol}: Creating active trade`);
         }
 
         // For now, create trades for the authenticated user making the request
@@ -219,20 +233,27 @@ serve(async (req) => {
         const nextCheck = new Date();
         nextCheck.setHours(nextCheck.getHours() + 3);
 
-        console.log(`Attempting to create trade for ${symbol} with userId: ${userId}`);
+        console.log(`Attempting to create trade record for ${symbol} with userId: ${userId}, status: ${tradeStatus}`);
+        
+        // Prepare trade data - handle both valid and invalid analysis
+        const tradeData = {
+          symbol,
+          session_name: sessionName,
+          user_id: userId,
+          status: tradeStatus,
+          rejection_reason: rejectionReason,
+          ai_confidence: analysis?.confidence || null,
+          risk_reward_ratio: analysis?.rrRatio || null,
+          action: analysis?.action || 'UNKNOWN',
+          entry_price: analysis?.entry || 0,
+          stop_loss: analysis?.stopLoss || 0,
+          take_profit: analysis?.takeProfit || 0,
+          next_check_at: tradeStatus === 'OPEN' ? nextCheck.toISOString() : null
+        };
         
         const { data: trade, error } = await supabase
           .from('auto_trades')
-          .insert({
-            symbol,
-            action: analysis.action,
-            entry_price: analysis.entry,
-            stop_loss: analysis.stopLoss,
-            take_profit: analysis.takeProfit,
-            session_name: sessionName,
-            next_check_at: nextCheck.toISOString(),
-            user_id: userId
-          })
+          .insert(tradeData)
           .select()
           .single();
 

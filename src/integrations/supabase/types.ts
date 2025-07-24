@@ -17,12 +17,15 @@ export type Database = {
       auto_trades: {
         Row: {
           action: string
+          ai_confidence: number | null
           closed_at: string | null
           created_at: string
           entry_price: number
           id: string
           next_check_at: string | null
           pips_result: number | null
+          rejection_reason: string | null
+          risk_reward_ratio: number | null
           session_name: string
           status: string
           stop_loss: number
@@ -33,12 +36,15 @@ export type Database = {
         }
         Insert: {
           action: string
+          ai_confidence?: number | null
           closed_at?: string | null
           created_at?: string
           entry_price: number
           id?: string
           next_check_at?: string | null
           pips_result?: number | null
+          rejection_reason?: string | null
+          risk_reward_ratio?: number | null
           session_name: string
           status?: string
           stop_loss: number
@@ -49,12 +55,15 @@ export type Database = {
         }
         Update: {
           action?: string
+          ai_confidence?: number | null
           closed_at?: string | null
           created_at?: string
           entry_price?: number
           id?: string
           next_check_at?: string | null
           pips_result?: number | null
+          rejection_reason?: string | null
+          risk_reward_ratio?: number | null
           session_name?: string
           status?: string
           stop_loss?: number
