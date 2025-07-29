@@ -438,6 +438,8 @@ export function TradingDashboard() {
         historicalData: data.historicalData,
         historical4hData: data.historical4hData,
         technicalAnalysis: analysis.technicalAnalysis,
+        trendAnalysis: analysis.trendAnalysis,
+        marketSession: analysis.marketSession,
         strategy: analysis.strategy || selectedStrategy
       });
 
@@ -899,6 +901,160 @@ export function TradingDashboard() {
           </div>
         )}
 
+        {/* Enhanced Technical Indicators Display */}
+        {analysisInputData?.technicalAnalysis && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Enhanced Technical Analysis
+                {analysisInputData.technicalAnalysis.volatility && (
+                  <Badge 
+                    variant={
+                      analysisInputData.technicalAnalysis.volatility.status === 'HIGH' ? 'destructive' :
+                      analysisInputData.technicalAnalysis.volatility.status === 'MODERATE' ? 'default' :
+                      'secondary'
+                    }
+                    className="ml-auto"
+                  >
+                    {analysisInputData.technicalAnalysis.volatility.status} Volatility
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Key Levels */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm text-muted-foreground">Support</h4>
+                  <p className="text-lg font-bold text-buy">{analysisInputData.technicalAnalysis.support?.toFixed(5)}</p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm text-muted-foreground">Resistance</h4>
+                  <p className="text-lg font-bold text-sell">{analysisInputData.technicalAnalysis.resistance?.toFixed(5)}</p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm text-muted-foreground">RSI (14)</h4>
+                  <p className={`text-lg font-bold ${
+                    analysisInputData.technicalAnalysis.rsi < 30 ? 'text-buy' :
+                    analysisInputData.technicalAnalysis.rsi > 70 ? 'text-sell' :
+                    'text-foreground'
+                  }`}>
+                    {analysisInputData.technicalAnalysis.rsi?.toFixed(1)}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm text-muted-foreground">ATR</h4>
+                  <p className="text-lg font-bold text-foreground">{analysisInputData.technicalAnalysis.atr?.toFixed(5)}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Volatility Analysis */}
+              {analysisInputData.technicalAnalysis.volatility && (
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-base">Volatility Analysis</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">ATR Percentage</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xl font-bold">{analysisInputData.technicalAnalysis.volatility.atrPercentage}%</p>
+                        <Badge variant={
+                          analysisInputData.technicalAnalysis.volatility.atrPercentage > 0.6 ? 'destructive' :
+                          analysisInputData.technicalAnalysis.volatility.atrPercentage > 0.3 ? 'default' :
+                          'secondary'
+                        }>
+                          {analysisInputData.technicalAnalysis.volatility.status}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Bollinger Band Width</p>
+                      <p className="text-xl font-bold">{analysisInputData.technicalAnalysis.volatility.bbandWidth}%</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Volatility Status</p>
+                      <Badge variant={
+                        analysisInputData.technicalAnalysis.volatility.status === 'HIGH' ? 'destructive' :
+                        analysisInputData.technicalAnalysis.volatility.status === 'MODERATE' ? 'default' :
+                        'secondary'
+                      } className="text-sm">
+                        {analysisInputData.technicalAnalysis.volatility.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Separator />
+
+              {/* Moving Averages & MACD */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-base">Momentum Indicators</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">SMA 10</p>
+                    <p className="text-lg font-bold">{analysisInputData.technicalAnalysis.sma10?.toFixed(5)}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">SMA 20</p>
+                    <p className="text-lg font-bold">{analysisInputData.technicalAnalysis.sma20?.toFixed(5)}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">MACD</p>
+                    <p className={`text-lg font-bold ${
+                      analysisInputData.technicalAnalysis.macd?.macd > 0 ? 'text-buy' : 'text-sell'
+                    }`}>
+                      {analysisInputData.technicalAnalysis.macd?.macd?.toFixed(5)}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">MACD Signal</p>
+                    <p className="text-lg font-bold">{analysisInputData.technicalAnalysis.macd?.signal?.toFixed(5)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Multi-timeframe Analysis */}
+              {analysisInputData.technicalAnalysis.multiTimeframe && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <h4 className="font-semibold text-base">Multi-Timeframe Analysis</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">Confluence Score</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xl font-bold">{analysisInputData.technicalAnalysis.multiTimeframe.confluence}%</p>
+                          <Badge variant={
+                            analysisInputData.technicalAnalysis.multiTimeframe.confluence > 70 ? 'default' :
+                            analysisInputData.technicalAnalysis.multiTimeframe.confluence > 50 ? 'secondary' :
+                            'outline'
+                          }>
+                            {analysisInputData.technicalAnalysis.multiTimeframe.confluence > 70 ? 'Strong' :
+                             analysisInputData.technicalAnalysis.multiTimeframe.confluence > 50 ? 'Moderate' : 'Weak'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">Trend Agreement</p>
+                        <Badge variant={analysisInputData.technicalAnalysis.multiTimeframe.agreement ? 'default' : 'outline'}>
+                          {analysisInputData.technicalAnalysis.multiTimeframe.agreement ? 'YES' : 'NO'}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">4H RSI</p>
+                        <p className="text-lg font-bold">{analysisInputData.technicalAnalysis.multiTimeframe.higher4h?.rsi?.toFixed(1)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Trading Recommendation */}
         {recommendation ? (
           <Card>
@@ -1074,6 +1230,30 @@ export function TradingDashboard() {
                     {JSON.stringify(analysisInputData.technicalAnalysis, null, 2)}
                   </pre>
                 </div>
+                
+                {analysisInputData.trendAnalysis && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h4 className="font-semibold mb-2">Trend Analysis</h4>
+                      <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+                        {JSON.stringify(analysisInputData.trendAnalysis, null, 2)}
+                      </pre>
+                    </div>
+                  </>
+                )}
+                
+                {analysisInputData.marketSession && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h4 className="font-semibold mb-2">Market Session Info</h4>
+                      <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+                        {JSON.stringify(analysisInputData.marketSession, null, 2)}
+                      </pre>
+                    </div>
+                  </>
+                )}
                 
                 <Separator />
                 

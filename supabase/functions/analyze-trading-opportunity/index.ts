@@ -79,6 +79,8 @@ serve(async (req) => {
       JSON.stringify({
         recommendation,
         technicalAnalysis,
+        trendAnalysis,
+        marketSession,
         strategy,
         success: true,
       }),
