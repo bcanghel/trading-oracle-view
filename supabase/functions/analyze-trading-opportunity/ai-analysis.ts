@@ -123,8 +123,7 @@ Respond with ONLY this JSON structure:
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      // IMPROVEMENT: Using a standard, powerful model
-      model: 'gpt-4-turbo',
+      model: 'gpt-4.1-2025-04-14',
       messages: [
         { role: 'system', content: 'You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.' },
         { role: 'user', content: analysisPrompt }
