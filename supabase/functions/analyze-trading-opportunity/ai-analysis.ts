@@ -11,7 +11,6 @@ export async function analyzeWithAI(
   strategy: string = '1H',
   historical4hData: any[] | null = null
 ) {
-  // Calculate algorithmic suggestions as assistive information
   const algorithmicSuggestion = calculateEntrySignal({
     currentPrice: currentData.currentPrice,
     technicalAnalysis,
@@ -21,113 +20,101 @@ export async function analyzeWithAI(
   });
 
   const openAIApiKey = Deno.env.get('OPEN_AI_API');
+  if (!openAIApiKey) throw new Error('OpenAI API key not configured');
 
-  if (!openAIApiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
-  // Enhanced prompt for multi-timeframe analysis
   const multiTimeframeContext = strategy === '1H+4H' && technicalAnalysis.multiTimeframe ? `
-
 ## MULTI-TIMEFRAME ANALYSIS (1H + 4H Strategy)
-- **Timeframe Confluence Score**: ${technicalAnalysis.multiTimeframe.confluence}%
-- **Trend Agreement**: ${technicalAnalysis.multiTimeframe.agreement ? 'YES' : 'NO'}
-- **4H Technical Data**: 
-  - RSI: ${technicalAnalysis.multiTimeframe.higher4h.rsi}
-  - SMA10: ${technicalAnalysis.multiTimeframe.higher4h.sma10}
-  - SMA20: ${technicalAnalysis.multiTimeframe.higher4h.sma20}
-  - Support: ${technicalAnalysis.multiTimeframe.higher4h.support}
-  - Resistance: ${technicalAnalysis.multiTimeframe.higher4h.resistance}
+- Confluence Score: ${technicalAnalysis.multiTimeframe.confluence}%
+- Trend Agreement: ${technicalAnalysis.multiTimeframe.agreement ? 'YES' : 'NO'}
+- 4H Data: RSI=${technicalAnalysis.multiTimeframe.higher4h.rsi}, SMA10=${technicalAnalysis.multiTimeframe.higher4h.sma10}, Support=${technicalAnalysis.multiTimeframe.higher4h.support}, Resistance=${technicalAnalysis.multiTimeframe.higher4h.resistance}
 
-**Multi-Timeframe Analysis Requirements:**
-- Only consider high-confidence setups when confluence score > 70%
-- Require both 1H and 4H trend alignment for trend-following trades
-- Use 4H levels for major support/resistance, 1H levels for fine-tuned entries
-- Increase confidence when both timeframes show same signals
-- Adjust risk/reward based on higher timeframe context
+**MULTI-TIMEFRAME REQUIREMENTS:**
+- Only consider high-confidence trades when confluence score > 60%
+- Both timeframes must align for trend-following strategies
+- Use 4H levels for major S/R, 1H for precise entries
+- Increase confidence significantly when both timeframes confirm signals
 ` : '';
 
-  const strategyNote = strategy === '1H+4H' ? 
-    'This analysis uses ENHANCED MULTI-TIMEFRAME strategy (1H + 4H)' : 
-    'This analysis uses STANDARD 1H strategy';
+  const strategyNote = strategy === '1H+4H' ? 'This analysis uses ENHANCED MULTI-TIMEFRAME strategy (1H + 4H)' : 'This analysis uses STANDARD 1H strategy';
 
-  // Create enhanced analysis prompt with algorithmic assistance
   const analysisPrompt = `
+You are an expert forex trading analyst with 15+ years of experience. Analyze ${symbol} and provide a strategic trading recommendation.
+
 ${strategyNote}
+${multiTimeframeContext}
 
-Analyze the forex market data for ${symbol} and provide your trading recommendation. Use the algorithmic calculations as assistive information to inform your decision.${multiTimeframeContext}
-
-ALGORITHMIC ASSISTANCE (for reference):
+ALGORITHMIC ASSISTANT REFERENCE:
 - Suggested Strategy: ${algorithmicSuggestion.strategy}
 - Suggested Action: ${algorithmicSuggestion.action}
 - Calculated Entry: ${algorithmicSuggestion.entryPrice}
-- Calculated Stop Loss: ${algorithmicSuggestion.stopLoss}
-- Calculated Take Profit: ${algorithmicSuggestion.takeProfit}
-- Risk/Reward Ratio: ${algorithmicSuggestion.riskRewardRatio}
-- Algorithmic Confidence: ${algorithmicSuggestion.confidence}%
-- Algorithmic Reasoning: ${algorithmicSuggestion.reasoning.join('. ')}
+- Calculated SL/TP: ${algorithmicSuggestion.stopLoss} / ${algorithmicSuggestion.takeProfit}
+- Risk/Reward: ${algorithmicSuggestion.riskRewardRatio}:1
+- Reasoning: ${algorithmicSuggestion.reasoning.join('. ')}
 
-COMPREHENSIVE MARKET DATA:
-- Symbol: ${symbol}
-- Current Price: ${currentData.currentPrice}
-- 24h Change: ${currentData.changePercent}%
-- 24h High: ${currentData.high24h}
-- 24h Low: ${currentData.low24h}
+ENHANCED MARKET DATA:
+**Price Action:**
+- Symbol: ${symbol} | Current: ${currentData.currentPrice}
+- 24h: ${currentData.changePercent}% (High: ${currentData.high24h}, Low: ${currentData.low24h})
 
-ENHANCED TECHNICAL ANALYSIS:
-- SMA(10): ${technicalAnalysis.sma10}
-- SMA(20): ${technicalAnalysis.sma20}
-- RSI: ${technicalAnalysis.rsi}
-- ATR: ${technicalAnalysis.atr}
-- MACD: ${technicalAnalysis.macd?.macd || 0} (Signal: ${technicalAnalysis.macd?.signal || 0})
-- Bollinger Bands: Upper=${technicalAnalysis.bollinger?.upper || 0}, Lower=${technicalAnalysis.bollinger?.lower || 0}
-- Support Level: ${technicalAnalysis.support}
-- Resistance Level: ${technicalAnalysis.resistance}
-- Pivot Points: R1=${technicalAnalysis.pivotPoints?.r1 || 0}, S1=${technicalAnalysis.pivotPoints?.s1 || 0}
-- Fibonacci Levels: 38.2%=${technicalAnalysis.fibonacci?.level382 || 0}, 61.8%=${technicalAnalysis.fibonacci?.level618 || 0}
-- Swing Levels: High=${technicalAnalysis.swingLevels?.swingHigh || 0}, Low=${technicalAnalysis.swingLevels?.swingLow || 0}
+**Technical Indicators:**
+- Moving Averages: SMA10=${technicalAnalysis.sma10}, SMA20=${technicalAnalysis.sma20}
+- Momentum: RSI=${technicalAnalysis.rsi}, MACD=${technicalAnalysis.macd?.macd} (Signal: ${technicalAnalysis.macd?.signal}, Histogram: ${technicalAnalysis.macd?.histogram})
+- Volatility: ATR=${technicalAnalysis.atr} (${technicalAnalysis.volatility?.atrPercentage}%), Status=${technicalAnalysis.volatility?.status}
+- Bollinger: Upper=${technicalAnalysis.bollinger?.upper}, Middle=${technicalAnalysis.bollinger?.middle}, Lower=${technicalAnalysis.bollinger?.lower}
+- Key Levels: Support=${technicalAnalysis.support}, Resistance=${technicalAnalysis.resistance}
+- Pivots: R1=${technicalAnalysis.pivotPoints?.r1}, Pivot=${technicalAnalysis.pivotPoints?.pivot}, S1=${technicalAnalysis.pivotPoints?.s1}
+- Fibonacci: 23.6%=${technicalAnalysis.fibonacci?.level236}, 38.2%=${technicalAnalysis.fibonacci?.level382}, 61.8%=${technicalAnalysis.fibonacci?.level618}
+- Swings: High=${technicalAnalysis.swingLevels?.swingHigh}, Low=${technicalAnalysis.swingLevels?.swingLow}
 
-TREND ANALYSIS:
-- Overall Trend: ${trendAnalysis.overallTrend}
-- Trend Strength: ${trendAnalysis.trendStrength}
-- Price Momentum: ${trendAnalysis.momentum}
-- Higher Highs/Lows: ${trendAnalysis.higherHighs ? 'Yes' : 'No'} / ${trendAnalysis.higherLows ? 'Yes' : 'No'}
-- Candle Patterns: ${trendAnalysis.candlePatterns}
-- Volume Trend: ${trendAnalysis.volumeTrend}
+**Trend & Pattern Analysis:**
+- Trend: ${trendAnalysis.overallTrend} (Strength: ${trendAnalysis.trendStrength})
+- Structure: Higher Highs=${trendAnalysis.higherHighs ? 'YES' : 'NO'}, Higher Lows=${trendAnalysis.higherLows ? 'YES' : 'NO'}
+- Momentum: ${trendAnalysis.momentum}
+- Patterns: ${trendAnalysis.candlePatterns}
+- Volume: ${trendAnalysis.volumeTrend}
 
-MARKET SESSION:
-- Current Romania Time: ${romaniaTime.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' })}
-- Active Session: ${marketSession.name}
-- Session Status: ${marketSession.status}
-- Volatility Level: ${marketSession.volatility}
-- Session Recommendation: ${marketSession.recommendation}
+**Session Context:**
+- Time: ${romaniaTime.toLocaleString('en-US', { timeZone: 'Europe/Bucharest', hour12: false })}
+- Session: ${marketSession.name} (${marketSession.status})
+- Volatility: ${marketSession.volatility} | Recommendation: ${marketSession.recommendation}
 
-Provide a JSON response with this EXACT structure:
+**EXPERT ANALYSIS FRAMEWORK:**
+1. **Technical Confluence:** Identify 3+ confirming signals from different indicator categories
+2. **Risk Management:** Ensure R:R ratio ≥ 1.5, position at logical S/R levels
+3. **Timing Precision:** Consider session volatility, news events, and momentum shifts
+4. **Entry Strategy:** Look for retracements, breakouts, or continuation patterns - NOT current price
+5. **Market Structure:** Respect major S/R levels and trend context
+
+**CONFIDENCE SCORING:**
+- 80-95%: Multiple strong confluences, clear direction, favorable session
+- 60-79%: Good setup with some confirmation, acceptable risk
+- 40-59%: Moderate setup, higher risk, requires tight management
+- 20-39%: Weak setup, only consider if forced to choose direction
+
+Respond with ONLY this JSON structure:
 {
-  "action": "BUY or SELL (HOLD is not allowed - you must choose one)",
-  "confidence": "integer from 10-95 based on your analysis",
-  "entry": "number - your predicted FUTURE entry level (NOT current price - should be at key support/resistance/technical level)",
-  "stopLoss": "number - your stop loss level",
-  "takeProfit": "number - your take profit level",
-  "support": "number - key support level you identify",
-  "resistance": "number - key resistance level you identify", 
-  "reasoning": "detailed explanation of your decision",
-  "riskReward": "number - your calculated risk to reward ratio (MINIMUM 1:1.5 - do not suggest trades below this)",
-  "entryConditions": "string - specific trigger conditions for entry",
-  "entryTiming": "string - timing guidance and session considerations",
-  "volumeConfirmation": "string - volume requirements for entry",
-  "candlestickSignals": "string - candlestick confirmation patterns to watch for"
+  "action": "BUY or SELL (must choose one - HOLD not allowed)",
+  "confidence": "integer 20-95 based on technical confluence and market conditions",
+  "entry": "number - strategic entry at key technical level (NOT current price)",
+  "stopLoss": "number - logical stop beyond key level",
+  "takeProfit": "number - target at next major S/R or 1.5+ R:R",
+  "support": "number - most critical support you identify",
+  "resistance": "number - most critical resistance you identify",
+  "reasoning": "detailed explanation referencing specific technical confluences and market structure",
+  "riskReward": "number - calculated R:R ratio (minimum 1.5)",
+  "entryConditions": "specific trigger conditions for entry (candlestick patterns, level breaks, etc.)",
+  "entryTiming": "session-specific timing guidance and liquidity considerations",
+  "volumeConfirmation": "volume requirements and signals to confirm entry",
+  "candlestickSignals": "specific candlestick patterns to watch for confirmation"
 }
 
-DECISION GUIDELINES:
-- You can agree or disagree with the algorithmic suggestion based on your analysis
-- Use the enhanced technical data to make informed decisions
-- Consider market context, session timing, and overall market structure
-- Provide clear reasoning for your recommendations
-- Base confidence on the strength of your analysis and market conditions
-- IMPORTANT: Entry level must be a strategic level based on support/resistance, not current price
-- Entry should be where price is likely to reach based on technical confluence
-- Consider retracements, breakout levels, or continuation patterns for entry timing`;
+**CRITICAL REQUIREMENTS:**
+- Entry must be a STRATEGIC LEVEL where price is likely to reach, not current market price
+- Must justify confidence score with specific technical confluences
+- Risk/reward must be ≥ 1.5:1
+- Consider session timing and volatility in your analysis
+- Reference multiple timeframes if using 1H+4H strategy
+- Provide actionable, specific entry and confirmation criteria`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -136,52 +123,37 @@ DECISION GUIDELINES:
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4.1-2025-04-14',
+      // IMPROVEMENT: Using a standard, powerful model
+      model: 'gpt-4-turbo',
       messages: [
-        {
-          role: 'system',
-          content: 'You are an expert forex trading analyst. You must respond with ONLY valid JSON format containing trading recommendations. No explanatory text before or after the JSON. Start your response with { and end with }.'
-        },
-        {
-          role: 'user',
-          content: analysisPrompt
-        }
+        { role: 'system', content: 'You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.' },
+        { role: 'user', content: analysisPrompt }
       ],
-      temperature: 0.1,
-      max_tokens: 1500,
+      temperature: 0.2, // Slightly increased for more nuanced analysis
+      max_tokens: 2000,
       response_format: { type: "json_object" },
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.statusText}`);
+    const errorBody = await response.text();
+    throw new Error(`OpenAI API error: ${response.statusText} - ${errorBody}`);
   }
 
   const aiResponse = await response.json();
   const analysisText = aiResponse.choices[0].message.content;
   
-  console.log('AI Response Text:', analysisText);
-  
   try {
-    // Clean the response text to ensure it's valid JSON
-    const cleanedText = analysisText.trim();
-    const recommendation = JSON.parse(cleanedText);
-    
-    // Validate the recommendation has required fields
+    const recommendation = JSON.parse(analysisText.trim());
     if (!recommendation.action || !recommendation.confidence || !recommendation.entry) {
       throw new Error('Missing required fields in AI response');
     }
-    
-    // Add algorithmic data to AI response for reference
     recommendation.algorithmicStrategy = algorithmicSuggestion.strategy;
     recommendation.algorithmicPositionSize = algorithmicSuggestion.positionSize;
-    
-    console.log('Successfully parsed AI recommendation:', recommendation);
     return recommendation;
-    
   } catch (parseError) {
-    console.log('AI analysis failed:', parseError.message);
-    console.log('Raw AI Response:', analysisText);
-    throw new Error('AI analysis unavailable');
+    console.error('AI analysis parsing failed:', parseError.message);
+    console.error('Raw AI Response:', analysisText);
+    throw new Error('AI analysis result was not valid JSON.');
   }
 }
