@@ -25,6 +25,8 @@ export type Database = {
           next_check_at: string | null
           pips_result: number | null
           rejection_reason: string | null
+          reward_pips: number | null
+          risk_pips: number | null
           risk_reward_ratio: number | null
           session_name: string
           status: string
@@ -44,6 +46,8 @@ export type Database = {
           next_check_at?: string | null
           pips_result?: number | null
           rejection_reason?: string | null
+          reward_pips?: number | null
+          risk_pips?: number | null
           risk_reward_ratio?: number | null
           session_name: string
           status?: string
@@ -63,6 +67,8 @@ export type Database = {
           next_check_at?: string | null
           pips_result?: number | null
           rejection_reason?: string | null
+          reward_pips?: number | null
+          risk_pips?: number | null
           risk_reward_ratio?: number | null
           session_name?: string
           status?: string
