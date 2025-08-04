@@ -247,26 +247,10 @@ serve(async (req) => {
           riskReward: analysis.riskReward
         } : 'null');
         
-        // Always create trades - no rejections, we need 3 trades per day
-        let rejectionReason = null;
-        let tradeStatus = 'OPEN';
-        
+        // Only create trades if AI analysis succeeds
         if (!analysis || analysis.error) {
-          // Even if AI fails, create a conservative trade
-          console.log(`AI failed for ${symbol}, creating conservative fallback trade`);
-          const currentPrice = marketData.currentData.currentPrice;
-          const conservative = {
-            action: 'BUY' as const, // Default to BUY
-            entry: currentPrice,
-            stopLoss: currentPrice - (0.005), // 50 pips for major pairs
-            takeProfit: currentPrice + (0.010), // 100 pips for major pairs
-            confidence: 30,
-            reasoning: 'Conservative fallback trade due to AI analysis failure',
-            rrRatio: 2.0,
-            riskPips: 50,
-            rewardPips: 100
-          };
-          analysis = conservative;
+          console.log(`AI analysis failed for ${symbol}, skipping trade creation`);
+          return null;
         }
         
         console.log(`CREATING TRADE ${symbol}: Always generate for daily target`);
@@ -291,15 +275,15 @@ serve(async (req) => {
         const nextCheck = new Date();
         nextCheck.setHours(nextCheck.getHours() + 3);
 
-        console.log(`Attempting to create trade record for ${symbol} with userId: ${userId}, status: ${tradeStatus}`);
+        console.log(`Attempting to create trade record for ${symbol} with userId: ${userId}`);
         
-        // Prepare trade data - handle both valid and invalid analysis
+        // Prepare trade data - only AI analysis trades
         const tradeData = {
           symbol,
           session_name: sessionName,
           user_id: userId,
-          status: tradeStatus,
-          rejection_reason: rejectionReason,
+          status: 'OPEN',
+          rejection_reason: null,
           ai_confidence: analysis?.confidence || null,
           risk_reward_ratio: analysis?.rrRatio || null,
           risk_pips: analysis?.riskPips || null,
@@ -308,7 +292,7 @@ serve(async (req) => {
           entry_price: analysis?.entry || marketData.currentData.currentPrice,
           stop_loss: analysis?.stopLoss || 0,
           take_profit: analysis?.takeProfit || 0,
-          next_check_at: tradeStatus === 'OPEN' ? nextCheck.toISOString() : null
+          next_check_at: nextCheck.toISOString()
         };
         
         const { data: trade, error } = await supabase
