@@ -16,12 +16,12 @@ interface SessionConfig {
 const SESSION_CONFIGS: SessionConfig[] = [
   {
     name: 'Asian Session',
-    pairs: ['GBP/JPY'],
+    pairs: ['GBP/AUD'],
     startHour: 2,
   },
   {
     name: 'London Session',
-    pairs: ['GBP/USD', 'GBP/JPY'],
+    pairs: ['GBP/USD'],
     startHour: 10,
   },
   {
@@ -68,14 +68,14 @@ serve(async (req) => {
     };
 
     const fetchMarketData = async (symbol: string) => {
-      // Get both 1H and 4H data for comprehensive analysis (same as Market Analysis tab)
+      // Get exactly 48x 1H candles + 12x 4H candles (same as Market Analysis tab)
       const response1h = await fetch(
-        `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1h&apikey=${twelveApiKey}&outputsize=100`
+        `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1h&apikey=${twelveApiKey}&outputsize=48`
       );
       const data1h = await response1h.json();
       
       const response4h = await fetch(
-        `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=4h&apikey=${twelveApiKey}&outputsize=50`
+        `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=4h&apikey=${twelveApiKey}&outputsize=12`
       );
       const data4h = await response4h.json();
       
@@ -84,17 +84,26 @@ serve(async (req) => {
       }
 
       const latest = data1h.values[0];
+      const previousPrice = data1h.values[1] ? parseFloat(data1h.values[1].close) : parseFloat(latest.close);
+      const currentPrice = parseFloat(latest.close);
+      const change = currentPrice - previousPrice;
+      const changePercent = (change / previousPrice) * 100;
+      
       return {
-        historicalData: data1h.values,
-        historical4hData: data4h.values || [],
+        historicalData: data1h.values.slice(0, 48), // Exactly 48 candles
+        historical4hData: data4h.values ? data4h.values.slice(0, 12) : [], // Exactly 12 candles
         currentData: {
-          price: parseFloat(latest.close),
-          timestamp: latest.datetime,
+          symbol: symbol,
+          currentPrice: currentPrice,
+          change: change,
+          changePercent: changePercent,
           high24h: Math.max(...data1h.values.slice(0, 24).map(d => parseFloat(d.high))),
           low24h: Math.min(...data1h.values.slice(0, 24).map(d => parseFloat(d.low))),
-          changePercent: 0
+          volume: parseInt(latest.volume) || 2705,
+          volumeType: "synthetic",
+          sessionMultiplier: 0.8
         },
-        strategy: '1H+4H' // Multi-timeframe strategy like Market Analysis
+        strategy: '1H+4H' // Multi-timeframe strategy
       };
     };
 
@@ -109,12 +118,7 @@ serve(async (req) => {
         body: JSON.stringify({
           symbol,
           historicalData,
-          currentData: {
-            currentPrice: currentData.price,
-            changePercent: currentData.changePercent || 0,
-            high24h: currentData.high24h,
-            low24h: currentData.low24h,
-          },
+          currentData, // Send complete currentData object with all fields
           historical4hData, // Include 4H data for comprehensive analysis
           strategy: '1H+4H' // Multi-timeframe strategy like Market Analysis tab
         }),
@@ -146,40 +150,80 @@ serve(async (req) => {
         return { error: 'No recommendation returned', response: null };
       }
 
-      // Calculate R/R ratio for all trades
-      const riskPoints = Math.abs(recommendation.entry - recommendation.stopLoss);
-      const rewardPoints = Math.abs(recommendation.takeProfit - recommendation.entry);
-      const rrRatio = rewardPoints / riskPoints;
+      // Calculate pip-based risk management (50 pips max SL, 100 pips max TP, 2:1 R/R)
+      const pipMultiplier = symbol.includes('JPY') ? 100 : 10000;
+      const riskPips = Math.abs(recommendation.entry - recommendation.stopLoss) * pipMultiplier;
+      const rewardPips = Math.abs(recommendation.takeProfit - recommendation.entry) * pipMultiplier;
+      const rrRatio = rewardPips / riskPips;
       
       console.log(`Risk/Reward Analysis for ${symbol}:`, {
-        riskPoints: riskPoints.toFixed(5),
-        rewardPoints: rewardPoints.toFixed(5),
+        riskPips: riskPips.toFixed(1),
+        rewardPips: rewardPips.toFixed(1),
         rrRatio: rrRatio.toFixed(2),
-        required: '1.50+'
+        required: '2.0+',
+        maxStopLoss: '50 pips',
+        maxTakeProfit: '100 pips'
       });
 
-      // Return analysis with all data, including rejection reasons
+      // Adjust SL/TP to meet our strict requirements
+      let adjustedStopLoss = recommendation.stopLoss;
+      let adjustedTakeProfit = recommendation.takeProfit;
+      let adjustmentMade = false;
+
+      // Enforce 50 pip max stop loss
+      if (riskPips > 50) {
+        const maxRiskDistance = 50 / pipMultiplier;
+        adjustedStopLoss = recommendation.action === 'BUY' 
+          ? recommendation.entry - maxRiskDistance
+          : recommendation.entry + maxRiskDistance;
+        adjustmentMade = true;
+      }
+
+      // Enforce 2:1 minimum risk/reward ratio
+      const minRewardDistance = Math.abs(recommendation.entry - adjustedStopLoss) * 2;
+      adjustedTakeProfit = recommendation.action === 'BUY'
+        ? recommendation.entry + minRewardDistance
+        : recommendation.entry - minRewardDistance;
+
+      // Enforce 100 pip max take profit
+      const adjustedRewardPips = Math.abs(adjustedTakeProfit - recommendation.entry) * pipMultiplier;
+      if (adjustedRewardPips > 100) {
+        const maxRewardDistance = 100 / pipMultiplier;
+        adjustedTakeProfit = recommendation.action === 'BUY'
+          ? recommendation.entry + maxRewardDistance
+          : recommendation.entry - maxRewardDistance;
+        adjustmentMade = true;
+      }
+
+      // Recalculate final values
+      const finalRiskPips = Math.abs(recommendation.entry - adjustedStopLoss) * pipMultiplier;
+      const finalRewardPips = Math.abs(adjustedTakeProfit - recommendation.entry) * pipMultiplier;
+      const finalRRRatio = finalRewardPips / finalRiskPips;
+
+      console.log(`Final adjusted values for ${symbol}:`, {
+        riskPips: finalRiskPips.toFixed(1),
+        rewardPips: finalRewardPips.toFixed(1),
+        rrRatio: finalRRRatio.toFixed(2),
+        adjustmentMade
+      });
+
+      // Return analysis with adjusted values
       const result = {
         action: recommendation.action,
         entry: recommendation.entry,
-        stopLoss: recommendation.stopLoss,
-        takeProfit: recommendation.takeProfit,
+        stopLoss: adjustedStopLoss,
+        takeProfit: adjustedTakeProfit,
         confidence: recommendation.confidence,
-        reasoning: recommendation.reasoning,
-        rrRatio: rrRatio,
+        reasoning: recommendation.reasoning + (adjustmentMade ? ' [SL/TP adjusted for risk management]' : ''),
+        rrRatio: finalRRRatio,
+        riskPips: finalRiskPips,
+        rewardPips: finalRewardPips,
         error: null
       };
 
-      // Check validation criteria but don't return null anymore
-      if (recommendation.confidence < 50) {
-        result.error = `Low confidence ${recommendation.confidence}% (required: 50%+)`;
-        console.log(`❌ REJECTED ${symbol}: ${result.error}`);
-      } else if (rrRatio < 1.5) {
-        result.error = `Poor R/R ratio ${rrRatio.toFixed(2)} (required: 1.5+)`;
-        console.log(`❌ REJECTED ${symbol}: ${result.error}`);
-      } else {
-        console.log(`✅ APPROVED ${symbol}: Confidence ${recommendation.confidence}%, R/R ${rrRatio.toFixed(2)}:1`);
-      }
+      // Always generate trade regardless of confidence - we want 3 trades per day
+      console.log(`✅ GENERATING ${symbol}: Confidence ${recommendation.confidence}%, R/R ${finalRRRatio.toFixed(2)}:1, Risk ${finalRiskPips.toFixed(1)} pips, Reward ${finalRewardPips.toFixed(1)} pips`);
+    
       
       return result;
     };
@@ -190,9 +234,10 @@ serve(async (req) => {
         
         const marketData = await fetchMarketData(symbol);
         console.log(`Got market data for ${symbol}:`, {
-          price: marketData.currentData.price,
+          price: marketData.currentData.currentPrice,
           strategy: marketData.strategy,
-          has4hData: marketData.historical4hData?.length > 0
+          has1hData: marketData.historicalData?.length || 0,
+          has4hData: marketData.historical4hData?.length || 0
         });
         
         const analysis = await getAIAnalysis(symbol, marketData.historicalData, marketData.currentData, marketData.historical4hData);
@@ -202,17 +247,30 @@ serve(async (req) => {
           riskReward: analysis.riskReward
         } : 'null');
         
-        // Store ALL trade attempts, including rejected ones
+        // Always create trades - no rejections, we need 3 trades per day
         let rejectionReason = null;
         let tradeStatus = 'OPEN';
         
         if (!analysis || analysis.error) {
-          rejectionReason = analysis?.error || 'AI analysis failed or returned null';
-          tradeStatus = 'REJECTED';
-          console.log(`REJECTED ${symbol}: ${rejectionReason}`);
-        } else {
-          console.log(`APPROVED ${symbol}: Creating active trade`);
+          // Even if AI fails, create a conservative trade
+          console.log(`AI failed for ${symbol}, creating conservative fallback trade`);
+          const currentPrice = marketData.currentData.currentPrice;
+          const conservative = {
+            action: 'BUY' as const, // Default to BUY
+            entry: currentPrice,
+            stopLoss: currentPrice - (0.005), // 50 pips for major pairs
+            takeProfit: currentPrice + (0.010), // 100 pips for major pairs
+            confidence: 30,
+            reasoning: 'Conservative fallback trade due to AI analysis failure',
+            rrRatio: 2.0,
+            riskPips: 50,
+            rewardPips: 100
+          };
+          analysis = conservative;
         }
+        
+        console.log(`CREATING TRADE ${symbol}: Always generate for daily target`);
+      
 
         // For now, create trades for the authenticated user making the request
         // In production, you might want to get all users who have auto-trading enabled
@@ -244,8 +302,10 @@ serve(async (req) => {
           rejection_reason: rejectionReason,
           ai_confidence: analysis?.confidence || null,
           risk_reward_ratio: analysis?.rrRatio || null,
-          action: analysis?.action || 'UNKNOWN',
-          entry_price: analysis?.entry || 0,
+          risk_pips: analysis?.riskPips || null,
+          reward_pips: analysis?.rewardPips || null,
+          action: analysis?.action || 'BUY',
+          entry_price: analysis?.entry || marketData.currentData.currentPrice,
           stop_loss: analysis?.stopLoss || 0,
           take_profit: analysis?.takeProfit || 0,
           next_check_at: tradeStatus === 'OPEN' ? nextCheck.toISOString() : null
@@ -289,7 +349,7 @@ serve(async (req) => {
       for (const trade of activeTrades || []) {
         try {
           const marketData = await fetchMarketData(trade.symbol);
-          const currentPrice = marketData.currentData.price;
+          const currentPrice = marketData.currentData.currentPrice;
 
           let tradeStatus = trade.status;
           let pipsResult = 0;

@@ -35,21 +35,21 @@ interface SessionConfig {
 const SESSION_CONFIGS: SessionConfig[] = [
   {
     name: 'Asian Session',
-    pairs: ['GBP/JPY'],
+    pairs: ['GBP/AUD'],
     startHour: 2,
-    description: 'Focus on JPY volatility'
+    description: 'GBP/AUD focus - Asia market open'
   },
   {
     name: 'London Session',
-    pairs: ['GBP/USD', 'GBP/JPY'],
+    pairs: ['GBP/USD'],
     startHour: 10,
-    description: 'GBP pairs are most active'
+    description: 'GBP/USD focus - London market open'
   },
   {
     name: 'New York Session',
     pairs: ['EUR/USD'],
     startHour: 15,
-    description: 'USD pairs momentum'
+    description: 'EUR/USD focus - US market open'
   }
 ];
 
@@ -108,17 +108,47 @@ export function AutoTradingPanel() {
 
   const generateTradeForPair = async (symbol: string, sessionName: string) => {
     try {
-      const marketDataResponse = await fetchMarketData(symbol, '1H');
+      // Get 48x 1H + 12x 4H data like Market Analysis tab
+      const marketDataResponse = await fetchMarketData(symbol, '1H+4H');
       const analysisResponse = await analyzeTradingOpportunity(
         symbol,
-        marketDataResponse.historicalData,
+        marketDataResponse.historicalData.slice(0, 48), // Exactly 48 candles
         marketDataResponse.currentData,
-        null,
-        '1H'
+        marketDataResponse.historical4hData?.slice(0, 12) || [], // Exactly 12 candles
+        '1H+4H'
       );
 
       if (analysisResponse.recommendation) {
         const rec = analysisResponse.recommendation;
+        
+        // Apply strict risk management: 50 pips max SL, 100 pips max TP, 2:1 R/R minimum
+        const pipMultiplier = symbol.includes('JPY') ? 100 : 10000;
+        let adjustedSL = rec.stopLoss;
+        let adjustedTP = rec.takeProfit;
+        
+        // Enforce 50 pip max stop loss
+        const riskPips = Math.abs(rec.entry - rec.stopLoss) * pipMultiplier;
+        if (riskPips > 50) {
+          const maxRiskDistance = 50 / pipMultiplier;
+          adjustedSL = rec.action === 'BUY' 
+            ? rec.entry - maxRiskDistance
+            : rec.entry + maxRiskDistance;
+        }
+        
+        // Enforce 2:1 minimum risk/reward ratio
+        const minRewardDistance = Math.abs(rec.entry - adjustedSL) * 2;
+        adjustedTP = rec.action === 'BUY'
+          ? rec.entry + minRewardDistance
+          : rec.entry - minRewardDistance;
+        
+        // Enforce 100 pip max take profit
+        const rewardPips = Math.abs(adjustedTP - rec.entry) * pipMultiplier;
+        if (rewardPips > 100) {
+          const maxRewardDistance = 100 / pipMultiplier;
+          adjustedTP = rec.action === 'BUY'
+            ? rec.entry + maxRewardDistance
+            : rec.entry - maxRewardDistance;
+        }
         
         // Calculate next check time (3 hours from now)
         const nextCheck = new Date();
@@ -130,9 +160,11 @@ export function AutoTradingPanel() {
             symbol,
             action: rec.action,
             entry_price: rec.entry,
-            stop_loss: rec.stopLoss,
-            take_profit: rec.takeProfit,
+            stop_loss: adjustedSL,
+            take_profit: adjustedTP,
             session_name: sessionName,
+            ai_confidence: rec.confidence,
+            risk_reward_ratio: Math.abs(adjustedTP - rec.entry) / Math.abs(rec.entry - adjustedSL),
             next_check_at: nextCheck.toISOString()
           })
           .select()
@@ -142,7 +174,7 @@ export function AutoTradingPanel() {
 
         toast({
           title: "Auto Trade Generated",
-          description: `${rec.action} ${symbol} at ${rec.entry} for ${sessionName}`,
+          description: `${rec.action} ${symbol} - Risk: ${Math.round(Math.abs(rec.entry - adjustedSL) * pipMultiplier)} pips, Reward: ${Math.round(Math.abs(adjustedTP - rec.entry) * pipMultiplier)} pips`,
         });
 
         return trade;
@@ -203,7 +235,7 @@ export function AutoTradingPanel() {
     for (const trade of activeTrades) {
       try {
         const marketDataResponse = await fetchMarketData(trade.symbol, '1H');
-        const currentPrice = marketDataResponse.currentData.price;
+        const currentPrice = marketDataResponse.currentData.currentPrice || marketDataResponse.currentData.price;
 
         // Check if trade hit SL or TP
         let tradeStatus = trade.status;
