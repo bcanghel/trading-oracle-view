@@ -256,21 +256,9 @@ serve(async (req) => {
         console.log(`CREATING TRADE ${symbol}: Always generate for daily target`);
       
 
-        // For now, create trades for the authenticated user making the request
-        // In production, you might want to get all users who have auto-trading enabled
-        const authHeader = req.headers.get('authorization');
-        let userId = 'b195e363-8000-4440-9632-f9af83eb0e8c'; // Your user ID as fallback
-        
-        if (authHeader) {
-          try {
-            const token = authHeader.replace('Bearer ', '');
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            userId = payload.sub;
-            console.log(`Using authenticated user: ${userId}`);
-          } catch (e) {
-            console.log('Could not parse auth header, using fallback user ID');
-          }
-        }
+        // Create trades for your user ID (since this is a scheduled function without auth context)
+        const userId = 'b195e363-8000-4440-9632-f9af83eb0e8c'; // Your user ID
+        console.log(`Creating trade for user: ${userId}`);
 
         const nextCheck = new Date();
         nextCheck.setHours(nextCheck.getHours() + 3);
