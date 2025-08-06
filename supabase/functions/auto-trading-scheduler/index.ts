@@ -228,6 +228,27 @@ serve(async (req) => {
       return result;
     };
 
+    const closeExistingTrade = async (trade: any, currentPrice: number, reason: string) => {
+      const pipsResult = calculatePips(trade.entry_price, currentPrice, trade.action, trade.symbol);
+      const status = pipsResult > 0 ? 'WIN' : 'LOSS';
+      
+      console.log(`Closing trade ${trade.id} (${trade.symbol} ${trade.action}): ${reason} - ${status} ${pipsResult} pips`);
+      
+      const { error } = await supabase
+        .from('auto_trades')
+        .update({
+          status: status,
+          pips_result: pipsResult,
+          closed_at: new Date().toISOString(),
+          rejection_reason: reason
+        })
+        .eq('id', trade.id);
+
+      if (error) {
+        console.error(`Failed to close trade ${trade.id}:`, error);
+      }
+    };
+
     const generateTradeForPair = async (symbol: string, sessionName: string) => {
       try {
         console.log(`Generating trade for ${symbol} - ${sessionName}`);
@@ -252,13 +273,35 @@ serve(async (req) => {
           console.log(`AI analysis failed for ${symbol}, skipping trade creation`);
           return null;
         }
+
+        const userId = 'b195e363-8000-4440-9632-f9af83eb0e8c'; // Your user ID
+        
+        // Check for existing open trades for this symbol
+        const { data: existingTrades, error: fetchError } = await supabase
+          .from('auto_trades')
+          .select('*')
+          .eq('symbol', symbol)
+          .eq('status', 'OPEN')
+          .eq('user_id', userId);
+
+        if (fetchError) {
+          console.error(`Failed to fetch existing trades for ${symbol}:`, fetchError);
+        }
+
+        if (existingTrades && existingTrades.length > 0) {
+          const existingTrade = existingTrades[0];
+          
+          // Check if direction changed
+          if (existingTrade.action !== analysis.action) {
+            console.log(`Direction changed for ${symbol}: ${existingTrade.action} -> ${analysis.action}, closing existing trade`);
+            await closeExistingTrade(existingTrade, marketData.currentData.currentPrice, 'Direction change');
+          } else {
+            console.log(`Same direction for ${symbol} (${analysis.action}), keeping existing trade`);
+            return null; // Don't create new trade
+          }
+        }
         
         console.log(`CREATING TRADE ${symbol}: Always generate for daily target`);
-      
-
-        // Create trades for your user ID (since this is a scheduled function without auth context)
-        const userId = 'b195e363-8000-4440-9632-f9af83eb0e8c'; // Your user ID
-        console.log(`Creating trade for user: ${userId}`);
 
         const nextCheck = new Date();
         nextCheck.setHours(nextCheck.getHours() + 3);
@@ -322,6 +365,16 @@ serve(async (req) => {
         try {
           const marketData = await fetchMarketData(trade.symbol);
           const currentPrice = marketData.currentData.currentPrice;
+
+          // Check if trade is older than 36 hours
+          const tradeAge = Date.now() - new Date(trade.created_at).getTime();
+          const maxAgeMs = 36 * 60 * 60 * 1000; // 36 hours in milliseconds
+
+          if (tradeAge > maxAgeMs) {
+            console.log(`Trade ${trade.id} exceeded 36 hours, auto-closing`);
+            await closeExistingTrade(trade, currentPrice, '36 hour limit exceeded');
+            continue;
+          }
 
           let tradeStatus = trade.status;
           let pipsResult = 0;
