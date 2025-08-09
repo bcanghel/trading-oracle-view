@@ -361,6 +361,25 @@ serve(async (req) => {
 
       console.log(`Found ${activeTrades?.length || 0} trades to check`);
 
+      // Check if it's Friday and close to market close (2 hours before 22:00 UTC)
+      const now = new Date();
+      const utcDay = now.getUTCDay(); // 0 = Sunday, 5 = Friday
+      const utcHour = now.getUTCHours();
+      
+      if (utcDay === 5 && utcHour >= 20) { // Friday after 20:00 UTC (2 hours before market close)
+        console.log("Friday market close approaching, closing all open trades");
+        for (const trade of activeTrades || []) {
+          try {
+            const marketData = await fetchMarketData(trade.symbol);
+            const currentPrice = marketData.currentData.currentPrice;
+            await closeExistingTrade(trade, currentPrice, 'Weekend closure - market closing');
+          } catch (error) {
+            console.error(`Failed to close trade ${trade.id} for weekend:`, error);
+          }
+        }
+        return;
+      }
+
       for (const trade of activeTrades || []) {
         try {
           const marketData = await fetchMarketData(trade.symbol);
