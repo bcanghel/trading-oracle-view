@@ -6,338 +6,275 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-if (!TELEGRAM_BOT_TOKEN) {
-  throw new Error('TELEGRAM_BOT_TOKEN environment variable is required');
-}
-
-const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-
-interface TelegramMessage {
-  message_id: number;
-  from: {
-    id: number;
-    first_name: string;
-    username?: string;
-  };
-  chat: {
-    id: number;
-    type: string;
-  };
-  text?: string;
-}
-
 interface TelegramUpdate {
   update_id: number;
-  message?: TelegramMessage;
+  message?: {
+    message_id: number;
+    from: {
+      id: number;
+      is_bot: boolean;
+      first_name: string;
+      username?: string;
+    };
+    chat: {
+      id: number;
+      first_name: string;
+      username?: string;
+      type: string;
+    };
+    date: number;
+    text: string;
+  };
 }
 
-async function sendTelegramMessage(chatId: number, text: string, parseMode = 'HTML') {
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: parseMode,
-      }),
-    });
+const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    const result = await response.json();
-    console.log('Telegram API response:', result);
-    
-    if (!result.ok) {
-      throw new Error(`Telegram API error: ${result.description}`);
-    }
-    
-    return result.result;
-  } catch (error) {
-    console.error('Error sending telegram message:', error);
-    throw error;
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+async function sendTelegramMessage(chatId: number, text: string, parseMode = 'HTML') {
+  const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text,
+      parse_mode: parseMode,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('Failed to send Telegram message:', await response.text());
+    return null;
   }
+
+  return await response.json();
 }
 
 async function handleStartCommand(chatId: number, firstName: string, username?: string) {
-  const welcomeMessage = `
-🤖 <b>Welcome to Oracle AI Auto Trader!</b>
+  // Check if user is already subscribed
+  const { data: existingSubscriber } = await supabase
+    .from('telegram_subscribers')
+    .select('*')
+    .eq('chat_id', chatId)
+    .single();
 
-Hello ${firstName}! I'm your trading signal bot. Here's what I can do:
+  if (existingSubscriber) {
+    await sendTelegramMessage(chatId, 
+      `Welcome back, ${firstName}! 🤖\n\n` +
+      `You're already subscribed to trading signals. Use /status to see your current settings.`
+    );
+    return;
+  }
 
-📊 <b>Features:</b>
-• Get real-time trading signals
-• Receive notifications when trades open/close
-• Subscribe to specific currency pairs
-• View your trading performance
+  // Create new subscriber
+  const { error } = await supabase
+    .from('telegram_subscribers')
+    .insert({
+      chat_id: chatId,
+      username: username,
+      first_name: firstName,
+      is_active: true,
+      subscribed_pairs: [], // Empty array means all pairs
+    });
 
-🔧 <b>Commands:</b>
-/start - Show this welcome message
-/subscribe - Subscribe to all trading signals
-/unsubscribe - Unsubscribe from all signals  
-/pairs - Manage currency pair subscriptions
-/status - Check your subscription status
-/help - Show detailed help
+  if (error) {
+    console.error('Error creating subscriber:', error);
+    await sendTelegramMessage(chatId, 
+      'Sorry, there was an error setting up your subscription. Please try again later.'
+    );
+    return;
+  }
 
-💡 <b>Getting Started:</b>
-Send /subscribe to start receiving trading signals!
+  await sendTelegramMessage(chatId, 
+    `🎉 Welcome to Oracle AI Auto Trader, ${firstName}!\n\n` +
+    `You're now subscribed to receive trading signals for all currency pairs.\n\n` +
+    `<b>Available Commands:</b>\n` +
+    `/status - View your subscription status\n` +
+    `/pairs - Subscribe to specific pairs\n` +
+    `/all - Subscribe to all pairs\n` +
+    `/stop - Unsubscribe from all signals\n` +
+    `/help - Show this help message\n\n` +
+    `🚀 You'll receive notifications when trades are opened and closed!`
+  );
+}
 
-⚠️ <b>Disclaimer:</b> Trading involves risk. Always do your own research and never invest more than you can afford to lose.
-`;
+async function handleStatusCommand(chatId: number) {
+  const { data: subscriber } = await supabase
+    .from('telegram_subscribers')
+    .select('*')
+    .eq('chat_id', chatId)
+    .single();
 
-  // Save subscriber to database
+  if (!subscriber) {
+    await sendTelegramMessage(chatId, 
+      'You are not subscribed yet. Send /start to subscribe to trading signals.'
+    );
+    return;
+  }
+
+  const pairsText = subscriber.subscribed_pairs.length === 0 
+    ? 'All currency pairs' 
+    : subscriber.subscribed_pairs.join(', ');
+
+  await sendTelegramMessage(chatId, 
+    `📊 <b>Your Subscription Status</b>\n\n` +
+    `Status: ${subscriber.is_active ? '✅ Active' : '❌ Inactive'}\n` +
+    `Subscribed pairs: ${pairsText}\n` +
+    `Subscribed since: ${new Date(subscriber.created_at).toLocaleDateString()}`
+  );
+}
+
+async function handlePairsCommand(chatId: number, pairs?: string) {
+  if (!pairs) {
+    await sendTelegramMessage(chatId, 
+      `📈 <b>Available Currency Pairs:</b>\n\n` +
+      `EUR/USD, GBP/USD, USD/JPY, USD/CHF, AUD/USD, USD/CAD, NZD/USD, EUR/GBP, EUR/JPY, GBP/JPY\n\n` +
+      `To subscribe to specific pairs, use:\n` +
+      `/pairs EUR/USD,GBP/USD,USD/JPY`
+    );
+    return;
+  }
+
+  const requestedPairs = pairs.split(',').map(p => p.trim().toUpperCase());
+  const validPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 'AUD/USD', 'USD/CAD', 'NZD/USD', 'EUR/GBP', 'EUR/JPY', 'GBP/JPY'];
+  const filteredPairs = requestedPairs.filter(p => validPairs.includes(p));
+
+  if (filteredPairs.length === 0) {
+    await sendTelegramMessage(chatId, 
+      'Invalid currency pairs. Please use valid pairs like EUR/USD, GBP/USD, etc.'
+    );
+    return;
+  }
+
   const { error } = await supabase
     .from('telegram_subscribers')
     .upsert({
       chat_id: chatId,
-      username: username,
-      first_name: firstName,
-      is_active: false, // Not active until they subscribe
-      subscribed_pairs: []
-    }, {
-      onConflict: 'chat_id'
+      subscribed_pairs: filteredPairs,
+      is_active: true,
     });
 
   if (error) {
-    console.error('Error saving subscriber:', error);
-  }
-
-  await sendTelegramMessage(chatId, welcomeMessage);
-}
-
-async function handleSubscribeCommand(chatId: number) {
-  const { error } = await supabase
-    .from('telegram_subscribers')
-    .update({ 
-      is_active: true,
-      subscribed_pairs: [] // Empty array means all pairs
-    })
-    .eq('chat_id', chatId);
-
-  if (error) {
-    console.error('Error updating subscription:', error);
-    await sendTelegramMessage(chatId, '❌ Error updating subscription. Please try again.');
+    console.error('Error updating pairs:', error);
+    await sendTelegramMessage(chatId, 'Error updating your subscription. Please try again.');
     return;
   }
 
-  const message = `
-✅ <b>Successfully Subscribed!</b>
-
-You will now receive:
-• Trade open notifications
-• Trade close notifications
-• Performance updates
-
-You're subscribed to <b>ALL currency pairs</b>.
-Use /pairs to customize which pairs you want to follow.
-
-Happy trading! 📈
-`;
-
-  await sendTelegramMessage(chatId, message);
+  await sendTelegramMessage(chatId, 
+    `✅ Successfully subscribed to: ${filteredPairs.join(', ')}\n\n` +
+    `You will receive trading signals for these pairs only.`
+  );
 }
 
-async function handleUnsubscribeCommand(chatId: number) {
+async function handleStopCommand(chatId: number) {
   const { error } = await supabase
     .from('telegram_subscribers')
     .update({ is_active: false })
     .eq('chat_id', chatId);
 
   if (error) {
-    console.error('Error updating subscription:', error);
-    await sendTelegramMessage(chatId, '❌ Error updating subscription. Please try again.');
+    console.error('Error deactivating subscription:', error);
+    await sendTelegramMessage(chatId, 'Error updating your subscription. Please try again.');
     return;
   }
 
-  const message = `
-🔕 <b>Unsubscribed Successfully</b>
-
-You will no longer receive trading notifications.
-
-To resubscribe anytime, just send /subscribe.
-
-Thank you for using Oracle AI Auto Trader! 
-`;
-
-  await sendTelegramMessage(chatId, message);
+  await sendTelegramMessage(chatId, 
+    `❌ You have been unsubscribed from trading signals.\n\n` +
+    `Send /start anytime to resubscribe.`
+  );
 }
 
-async function handleStatusCommand(chatId: number) {
-  const { data: subscriber, error } = await supabase
+async function handleAllCommand(chatId: number) {
+  const { error } = await supabase
     .from('telegram_subscribers')
-    .select('*')
-    .eq('chat_id', chatId)
-    .single();
+    .upsert({
+      chat_id: chatId,
+      subscribed_pairs: [], // Empty array means all pairs
+      is_active: true,
+    });
 
-  if (error || !subscriber) {
-    await sendTelegramMessage(chatId, '❌ You are not registered. Send /start to begin.');
+  if (error) {
+    console.error('Error subscribing to all pairs:', error);
+    await sendTelegramMessage(chatId, 'Error updating your subscription. Please try again.');
     return;
   }
 
-  const status = subscriber.is_active ? '✅ Active' : '🔕 Inactive';
-  const pairs = subscriber.subscribed_pairs.length === 0 
-    ? 'All currency pairs' 
-    : subscriber.subscribed_pairs.join(', ');
-
-  const message = `
-📊 <b>Your Subscription Status</b>
-
-<b>Status:</b> ${status}
-<b>Following:</b> ${pairs}
-<b>Member since:</b> ${new Date(subscriber.created_at).toLocaleDateString()}
-
-${subscriber.is_active ? '' : '\nSend /subscribe to activate notifications.'}
-`;
-
-  await sendTelegramMessage(chatId, message);
-}
-
-async function handlePairsCommand(chatId: number) {
-  const availablePairs = [
-    'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF', 
-    'AUD/USD', 'USD/CAD', 'NZD/USD', 'EUR/GBP', 
-    'EUR/JPY', 'GBP/JPY'
-  ];
-
-  const message = `
-📈 <b>Currency Pairs Management</b>
-
-Available pairs:
-${availablePairs.map(pair => `• ${pair}`).join('\n')}
-
-<b>Current setting:</b> You're following ALL pairs
-
-<i>Advanced pair selection coming soon! For now, you receive signals for all major pairs.</i>
-
-Use /subscribe to ensure you're getting all signals.
-`;
-
-  await sendTelegramMessage(chatId, message);
+  await sendTelegramMessage(chatId, 
+    `✅ Successfully subscribed to ALL currency pairs!\n\n` +
+    `You will receive trading signals for all available pairs.`
+  );
 }
 
 async function handleHelpCommand(chatId: number) {
-  const message = `
-🆘 <b>Oracle AI Auto Trader - Help</b>
-
-<b>📊 About:</b>
-This bot provides automated forex trading signals using AI analysis. Signals are generated based on technical analysis, market sessions, and AI recommendations.
-
-<b>🔧 Commands:</b>
-/start - Welcome message and registration
-/subscribe - Start receiving trading signals
-/unsubscribe - Stop receiving signals
-/pairs - Manage currency pair subscriptions
-/status - Check your subscription status
-/help - Show this help message
-
-<b>📈 Signal Types:</b>
-• <b>Trade Open:</b> When a new position opens
-• <b>Trade Close:</b> When a position closes with results
-• <b>Updates:</b> Important trade modifications
-
-<b>📊 Signal Information Includes:</b>
-• Currency pair (e.g., EUR/USD)
-• Action (BUY/SELL)
-• Entry price
-• Stop loss and take profit levels
-• AI confidence level
-• Session information
-
-<b>⚠️ Important:</b>
-• Signals are for educational purposes
-• Always do your own research
-• Never risk more than you can afford to lose
-• Past performance doesn't guarantee future results
-
-<b>🐛 Issues?</b>
-If you experience any problems, try /start to refresh your registration.
-
-Happy trading! 🚀
-`;
-
-  await sendTelegramMessage(chatId, message);
-}
-
-async function processMessage(update: TelegramUpdate) {
-  if (!update.message) return;
-
-  const { message } = update;
-  const chatId = message.chat.id;
-  const text = message.text || '';
-  const firstName = message.from.first_name;
-  const username = message.from.username;
-
-  console.log(`Received message from ${firstName} (${chatId}): ${text}`);
-
-  try {
-    if (text.startsWith('/start')) {
-      await handleStartCommand(chatId, firstName, username);
-    } else if (text.startsWith('/subscribe')) {
-      await handleSubscribeCommand(chatId);
-    } else if (text.startsWith('/unsubscribe')) {
-      await handleUnsubscribeCommand(chatId);
-    } else if (text.startsWith('/status')) {
-      await handleStatusCommand(chatId);
-    } else if (text.startsWith('/pairs')) {
-      await handlePairsCommand(chatId);
-    } else if (text.startsWith('/help')) {
-      await handleHelpCommand(chatId);
-    } else {
-      // Default response for unknown commands
-      await sendTelegramMessage(chatId, `
-🤖 I didn't understand that command.
-
-Send /help to see available commands or /start to begin.
-`);
-    }
-  } catch (error) {
-    console.error('Error processing message:', error);
-    await sendTelegramMessage(chatId, '❌ Sorry, something went wrong. Please try again.');
-  }
+  await sendTelegramMessage(chatId, 
+    `🤖 <b>Oracle AI Auto Trader Bot</b>\n\n` +
+    `<b>Available Commands:</b>\n` +
+    `/start - Subscribe to trading signals\n` +
+    `/status - View your subscription status\n` +
+    `/pairs - Subscribe to specific pairs\n` +
+    `/all - Subscribe to all pairs\n` +
+    `/stop - Unsubscribe from all signals\n` +
+    `/help - Show this help message\n\n` +
+    `<b>Example:</b>\n` +
+    `/pairs EUR/USD,GBP/USD - Subscribe to specific pairs\n\n` +
+    `📊 Get real-time notifications when trades are opened and closed!`
+  );
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    if (req.method === 'POST') {
-      // Handle Telegram webhook
-      const update: TelegramUpdate = await req.json();
-      console.log('Received update:', update);
-      
-      await processMessage(update);
-      
-      return new Response('OK', { 
-        status: 200,
-        headers: corsHeaders 
-      });
-    } else if (req.method === 'GET') {
-      // Health check endpoint
-      return new Response(JSON.stringify({ 
-        status: 'active',
-        bot_token_configured: !!TELEGRAM_BOT_TOKEN 
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    } else {
-      return new Response('Method not allowed', { 
-        status: 405,
-        headers: corsHeaders 
-      });
+    if (!TELEGRAM_BOT_TOKEN) {
+      throw new Error('TELEGRAM_BOT_TOKEN environment variable is not set');
     }
+
+    const body = await req.json();
+    console.log('Received Telegram update:', JSON.stringify(body, null, 2));
+
+    if (!body.message || !body.message.text) {
+      return new Response('OK', { headers: corsHeaders });
+    }
+
+    const message = body.message;
+    const chatId = message.chat.id;
+    const text = message.text.trim();
+    const firstName = message.from.first_name;
+    const username = message.from.username;
+
+    console.log(`Received message from ${firstName}: ${text}`);
+
+    if (text.startsWith('/start')) {
+      await handleStartCommand(chatId, firstName, username);
+    } else if (text.startsWith('/status')) {
+      await handleStatusCommand(chatId);
+    } else if (text.startsWith('/pairs')) {
+      const pairs = text.replace('/pairs', '').trim();
+      await handlePairsCommand(chatId, pairs || undefined);
+    } else if (text.startsWith('/all')) {
+      await handleAllCommand(chatId);
+    } else if (text.startsWith('/stop')) {
+      await handleStopCommand(chatId);
+    } else if (text.startsWith('/help')) {
+      await handleHelpCommand(chatId);
+    } else {
+      await sendTelegramMessage(chatId, 
+        `I don't understand that command. Send /help to see available commands.`
+      );
+    }
+
+    return new Response('OK', { headers: corsHeaders });
   } catch (error) {
     console.error('Error in telegram-bot function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });
