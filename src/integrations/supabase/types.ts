@@ -22,6 +22,7 @@ export type Database = {
           created_at: string
           entry_price: number
           id: string
+          lot_size: number | null
           next_check_at: string | null
           pips_result: number | null
           rejection_reason: string | null
@@ -43,6 +44,7 @@ export type Database = {
           created_at?: string
           entry_price: number
           id?: string
+          lot_size?: number | null
           next_check_at?: string | null
           pips_result?: number | null
           rejection_reason?: string | null
@@ -64,6 +66,7 @@ export type Database = {
           created_at?: string
           entry_price?: number
           id?: string
+          lot_size?: number | null
           next_check_at?: string | null
           pips_result?: number | null
           rejection_reason?: string | null
@@ -77,6 +80,86 @@ export type Database = {
           take_profit?: number
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      telegram_notifications: {
+        Row: {
+          chat_id: number
+          error_message: string | null
+          id: string
+          message_text: string
+          notification_type: string
+          sent_at: string
+          success: boolean
+          telegram_message_id: number | null
+          trade_id: string | null
+        }
+        Insert: {
+          chat_id: number
+          error_message?: string | null
+          id?: string
+          message_text: string
+          notification_type: string
+          sent_at?: string
+          success?: boolean
+          telegram_message_id?: number | null
+          trade_id?: string | null
+        }
+        Update: {
+          chat_id?: number
+          error_message?: string | null
+          id?: string
+          message_text?: string
+          notification_type?: string
+          sent_at?: string
+          success?: boolean
+          telegram_message_id?: number | null
+          trade_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_notifications_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "auto_trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_subscribers: {
+        Row: {
+          chat_id: number
+          created_at: string
+          first_name: string | null
+          id: string
+          is_active: boolean
+          subscribed_pairs: string[] | null
+          updated_at: string
+          user_id: string | null
+          username: string | null
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          is_active?: boolean
+          subscribed_pairs?: string[] | null
+          updated_at?: string
+          user_id?: string | null
+          username?: string | null
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          is_active?: boolean
+          subscribed_pairs?: string[] | null
+          updated_at?: string
+          user_id?: string | null
+          username?: string | null
         }
         Relationships: []
       }
