@@ -323,6 +323,7 @@ serve(async (req) => {
           entry_price: analysis?.entry || marketData.currentData.currentPrice,
           stop_loss: analysis?.stopLoss || 0,
           take_profit: analysis?.takeProfit || 0,
+          lot_size: 0.01, // Standard lot size for auto trades
           next_check_at: nextCheck.toISOString()
         };
         

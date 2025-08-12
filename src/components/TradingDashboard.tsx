@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import UserMenu from "@/components/UserMenu";
 import { MarketSessions } from "@/components/MarketSessions";
 import { AutoTradingPanel } from "@/components/AutoTradingPanel";
+import { MT5Integration } from "@/components/MT5Integration";
 
 interface TradingRecommendation {
   action: 'BUY' | 'SELL';
@@ -616,7 +617,7 @@ export function TradingDashboard() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="analysis" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="analysis" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Market Analysis
@@ -628,6 +629,10 @@ export function TradingDashboard() {
             <TabsTrigger value="sessions" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               Market Sessions
+            </TabsTrigger>
+            <TabsTrigger value="mt5-integration" className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              MT5 Integration
             </TabsTrigger>
           </TabsList>
 
@@ -1305,6 +1310,10 @@ export function TradingDashboard() {
 
           <TabsContent value="sessions">
             <MarketSessions />
+          </TabsContent>
+
+          <TabsContent value="mt5-integration">
+            <MT5Integration />
           </TabsContent>
         </Tabs>
       </div>
