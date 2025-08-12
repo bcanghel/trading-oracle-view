@@ -1305,7 +1305,8 @@ export function TradingDashboard() {
           </TabsContent>
 
           <TabsContent value="auto-trading">
-            <AutoTradingPanel />
+              <AutoTradingPanel />
+              <MT5Integration />
           </TabsContent>
 
           <TabsContent value="sessions">
