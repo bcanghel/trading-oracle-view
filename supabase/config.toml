@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.auto-trading-scheduler]
 verify_jwt = false
+
+[functions.telegram-bot]
+verify_jwt = false
+
+[functions.telegram-notifications]
+verify_jwt = false
