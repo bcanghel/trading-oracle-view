@@ -56,9 +56,40 @@ async function sendTelegramMessage(chatId: number, text: string, parseMode = 'HT
   }
 }
 
-function formatTradeOpenMessage(trade: TradeNotification): string {
+async function formatTradeOpenMessage(trade: TradeNotification): Promise<string> {
   const confidenceEmoji = trade.ai_confidence && trade.ai_confidence > 0.8 ? '🔥' : '📊';
   const actionEmoji = trade.action === 'BUY' ? '🟢' : '🔴';
+  
+  // Calculate lot sizes for different accounts
+  let lotSizeInfo = '';
+  try {
+    const lotCalculationResponse = await fetch(`${SUPABASE_URL}/functions/v1/lot-size-calculator`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+      },
+      body: JSON.stringify({
+        symbol: trade.symbol,
+        entryPrice: trade.entry_price,
+        stopLoss: trade.stop_loss,
+        riskPercentage: 1,
+        leverage: 100
+      }),
+    });
+
+    if (lotCalculationResponse.ok) {
+      const lotData = await lotCalculationResponse.json();
+      lotSizeInfo = `\n📊 <b>POSITION SIZING (1% Risk, 1:100 Leverage):</b>\n` +
+        `💼 ${lotData.calculations.account10k.accountSize}: <b>${lotData.calculations.account10k.standardLot} lots</b> (${lotData.calculations.account10k.microLot} micro)\n` +
+        `💼 ${lotData.calculations.account25k.accountSize}: <b>${lotData.calculations.account25k.standardLot} lots</b> (${lotData.calculations.account25k.microLot} micro)\n` +
+        `💵 Risk: $${lotData.calculations.account10k.riskAmount} / $${lotData.calculations.account25k.riskAmount}\n` +
+        `📏 Pip Risk: ${lotData.calculations.account10k.pipRisk} pips\n`;
+    }
+  } catch (error) {
+    console.error('Error calculating lot sizes:', error);
+    lotSizeInfo = '\n⚠️ <i>Lot size calculation unavailable</i>\n';
+  }
   
   return `${confidenceEmoji} <b>NEW TRADE SIGNAL</b> ${actionEmoji}\n\n` +
     `💱 <b>Pair:</b> ${trade.symbol}\n` +
@@ -68,8 +99,9 @@ function formatTradeOpenMessage(trade: TradeNotification): string {
     `🎯 <b>Take Profit:</b> ${trade.take_profit}\n` +
     `⏰ <b>Session:</b> ${trade.session_name}\n` +
     `🎲 <b>Confidence:</b> ${trade.ai_confidence ? (trade.ai_confidence * 100).toFixed(1) + '%' : 'N/A'}\n` +
-    `📊 <b>Risk/Reward:</b> ${trade.risk_reward_ratio ? `1:${trade.risk_reward_ratio.toFixed(2)}` : 'N/A'}\n\n` +
-    `🚀 Trade opened at ${new Date(trade.created_at).toLocaleString()}`;
+    `📊 <b>Risk/Reward:</b> ${trade.risk_reward_ratio ? `1:${trade.risk_reward_ratio.toFixed(2)}` : 'N/A'}` +
+    lotSizeInfo +
+    `\n🚀 Trade opened at ${new Date(trade.created_at).toLocaleString()}`;
 }
 
 function formatTradeCloseMessage(trade: TradeNotification): string {
@@ -174,7 +206,7 @@ serve(async (req) => {
     let notificationType: string;
 
     if (status === 'OPEN') {
-      message = formatTradeOpenMessage(notification);
+      message = await formatTradeOpenMessage(notification);
       notificationType = 'TRADE_OPEN';
     } else if (status === 'CLOSED') {
       message = formatTradeCloseMessage(notification);
