@@ -353,6 +353,30 @@ serve(async (req) => {
           return null;
         }
 
+        // Determine order type and initial status
+        const currentPrice = marketData.currentData.currentPrice;
+        const isMarketOrder = Math.abs(analysis.entry - currentPrice) < 0.0001; // Within 0.1 pip
+        const orderType = isMarketOrder ? 'MARKET' : 'LIMIT';
+        const entryFilled = isMarketOrder; // Market orders are filled immediately
+        
+        console.log(`${orderType} order for ${symbol}: Entry ${analysis.entry}, Current ${currentPrice}`);
+
+        // For limit orders, validate entry direction makes sense
+        if (!isMarketOrder) {
+          const isBuyLimitValid = analysis.action === 'BUY' && analysis.entry < currentPrice;
+          const isSellLimitValid = analysis.action === 'SELL' && analysis.entry > currentPrice;
+          
+          if (!isBuyLimitValid && !isSellLimitValid) {
+            console.log(`⚠️ Invalid limit order: ${analysis.action} entry ${analysis.entry} vs current ${currentPrice}`);
+            // Convert to market order for immediate execution
+            analysis.entry = currentPrice;
+            const orderType = 'MARKET';
+            const entryFilled = true;
+            console.log(`🔧 Converted to market order at ${currentPrice}`);
+          }
+        }
+        
+        
         const userId = 'b195e363-8000-4440-9632-f9af83eb0e8c'; // Your user ID
         
         // Check for existing open trades for this symbol
@@ -382,9 +406,6 @@ serve(async (req) => {
         
         console.log(`CREATING TRADE ${symbol}: Always generate for daily target`);
 
-        const nextCheck = new Date();
-        nextCheck.setHours(nextCheck.getHours() + 3);
-
         console.log(`Attempting to create trade record for ${symbol} with userId: ${userId}`);
         
         // Calculate lot sizes for this trade
@@ -401,12 +422,15 @@ serve(async (req) => {
           pipRisk: lotSizeInfo.pipRisk
         });
         
-        // Prepare trade data - only AI analysis trades
+        // Prepare trade data with new order type fields
         const tradeData = {
           symbol,
           session_name: sessionName,
           user_id: userId,
           status: 'OPEN',
+          order_type: orderType,
+          entry_filled: entryFilled,
+          entry_filled_at: entryFilled ? new Date().toISOString() : null,
           rejection_reason: null,
           ai_confidence: analysis?.confidence || null,
           risk_reward_ratio: analysis?.rrRatio || null,
@@ -416,11 +440,11 @@ serve(async (req) => {
           entry_price: analysis?.entry || marketData.currentData.currentPrice,
           stop_loss: analysis?.stopLoss || 0,
           take_profit: analysis?.takeProfit || 0,
-          lot_size: lotSizeInfo.standardLot, // Calculated lot size
+          lot_size: lotSizeInfo.standardLot,
           calculated_micro_lots: lotSizeInfo.microLot,
           calculated_risk_amount: lotSizeInfo.riskAmount,
           calculated_pip_risk: lotSizeInfo.pipRisk,
-          next_check_at: nextCheck.toISOString()
+          next_check_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()
         };
         
         const { data: trade, error } = await supabase
@@ -438,17 +462,16 @@ serve(async (req) => {
           // Send Telegram notification for new trade
           try {
             const notificationData = {
-              tradeId: trade.id,
+              trade_id: trade.id,
               symbol: trade.symbol,
               action: trade.action,
               entry_price: trade.entry_price,
               stop_loss: trade.stop_loss,
               take_profit: trade.take_profit,
-              session_name: trade.session_name,
-              status: 'OPEN',
-              ai_confidence: trade.ai_confidence,
-              risk_reward_ratio: trade.risk_reward_ratio,
-              created_at: trade.created_at
+              order_type: trade.order_type,
+              confidence: trade.ai_confidence,
+              session: trade.session_name,
+              notification_type: 'trade_opened'
             };
 
             console.log(`Sending Telegram notification for trade ${trade.id}`);
@@ -521,6 +544,45 @@ serve(async (req) => {
           if (tradeAge > maxAgeMs) {
             console.log(`Trade ${trade.id} exceeded 36 hours, auto-closing`);
             await closeExistingTrade(trade, currentPrice, '36 hour limit exceeded');
+            continue;
+          }
+
+          // Handle limit orders that haven't been filled yet
+          if (trade.order_type === 'LIMIT' && !trade.entry_filled) {
+            let entryReached = false;
+            
+            if (trade.action === 'BUY' && currentPrice <= trade.entry_price) {
+              entryReached = true;
+            } else if (trade.action === 'SELL' && currentPrice >= trade.entry_price) {
+              entryReached = true;
+            }
+            
+            if (entryReached) {
+              console.log(`Limit order ${trade.id} filled: ${trade.action} ${trade.symbol} at ${currentPrice} (target: ${trade.entry_price})`);
+              
+              // Mark entry as filled
+              const { error: fillError } = await supabase
+                .from('auto_trades')
+                .update({
+                  entry_filled: true,
+                  entry_filled_at: new Date().toISOString(),
+                  next_check_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+                })
+                .eq('id', trade.id);
+
+              if (fillError) {
+                console.error(`Failed to mark trade ${trade.id} as filled:`, fillError);
+              } else {
+                console.log(`Trade ${trade.id} now active and monitoring for SL/TP`);
+              }
+            }
+            
+            // Don't check SL/TP until entry is filled
+            continue;
+          }
+
+          // Only monitor SL/TP for filled trades (market orders or filled limit orders)
+          if (!trade.entry_filled) {
             continue;
           }
 

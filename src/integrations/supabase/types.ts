@@ -23,10 +23,13 @@ export type Database = {
           calculated_risk_amount: number | null
           closed_at: string | null
           created_at: string
+          entry_filled: boolean | null
+          entry_filled_at: string | null
           entry_price: number
           id: string
           lot_size: number | null
           next_check_at: string | null
+          order_type: string | null
           pips_result: number | null
           rejection_reason: string | null
           reward_pips: number | null
@@ -48,10 +51,13 @@ export type Database = {
           calculated_risk_amount?: number | null
           closed_at?: string | null
           created_at?: string
+          entry_filled?: boolean | null
+          entry_filled_at?: string | null
           entry_price: number
           id?: string
           lot_size?: number | null
           next_check_at?: string | null
+          order_type?: string | null
           pips_result?: number | null
           rejection_reason?: string | null
           reward_pips?: number | null
@@ -73,10 +79,13 @@ export type Database = {
           calculated_risk_amount?: number | null
           closed_at?: string | null
           created_at?: string
+          entry_filled?: boolean | null
+          entry_filled_at?: string | null
           entry_price?: number
           id?: string
           lot_size?: number | null
           next_check_at?: string | null
+          order_type?: string | null
           pips_result?: number | null
           rejection_reason?: string | null
           reward_pips?: number | null
