@@ -182,30 +182,49 @@ const PublicTrades = () => {
                 <p className="text-muted-foreground text-center py-4">No active trades</p>
               ) : (
                 activeTrades.map((trade, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {trade.action === 'BUY' ? (
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-600" />
-                      )}
-                      <div>
-                        <div className="font-semibold">{trade.symbol}</div>
-                        <div className="text-sm text-muted-foreground">{trade.session_name}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm">Entry: {trade.entry_price}</div>
-                      <div className="text-xs text-muted-foreground">
-                        SL: {trade.stop_loss} | TP: {trade.take_profit}
-                      </div>
-                      {(trade.calculated_micro_lots || trade.lot_size) && (
-                        <div className="text-xs text-blue-600 font-medium">
-                          Lot: {trade.lot_size || 0} ({trade.calculated_micro_lots || 0} micro)
+                  <div key={index} className="border rounded-lg p-4 space-y-3">
+                    {/* Header with symbol and action */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {trade.action === 'BUY' ? (
+                          <TrendingUp className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-5 w-5 text-red-600" />
+                        )}
+                        <div>
+                          <div className="font-bold text-lg">{trade.symbol}</div>
+                          <div className="text-sm text-muted-foreground">{trade.session_name}</div>
                         </div>
-                      )}
+                      </div>
+                      <Badge variant="secondary" className="text-sm px-3 py-1">OPEN</Badge>
                     </div>
-                    <Badge variant="secondary">OPEN</Badge>
+                    
+                    {/* Price information */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t">
+                      <div className="text-center sm:text-left">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Entry</div>
+                        <div className="font-semibold text-base">{trade.entry_price}</div>
+                      </div>
+                      <div className="text-center sm:text-left">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Stop Loss</div>
+                        <div className="font-semibold text-base text-red-600">{trade.stop_loss}</div>
+                      </div>
+                      <div className="text-center sm:text-left">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Take Profit</div>
+                        <div className="font-semibold text-base text-green-600">{trade.take_profit}</div>
+                      </div>
+                    </div>
+                    
+                    {/* Lot size information */}
+                    {(trade.calculated_micro_lots || trade.lot_size) && (
+                      <div className="flex justify-center sm:justify-start pt-2">
+                        <div className="bg-blue-50 dark:bg-blue-950 px-3 py-1 rounded-full">
+                          <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                            Lot: {trade.lot_size || 0} ({trade.calculated_micro_lots || 0} micro)
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
