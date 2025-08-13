@@ -338,6 +338,38 @@ serve(async (req) => {
           return null;
         } else {
           console.log(`Created trade ${trade.id} for ${symbol} - ${sessionName}`);
+          
+          // Send Telegram notification for new trade
+          try {
+            const notificationData = {
+              tradeId: trade.id,
+              symbol: trade.symbol,
+              action: trade.action,
+              entry_price: trade.entry_price,
+              stop_loss: trade.stop_loss,
+              take_profit: trade.take_profit,
+              session_name: trade.session_name,
+              status: 'OPEN',
+              ai_confidence: trade.ai_confidence,
+              risk_reward_ratio: trade.risk_reward_ratio,
+              created_at: trade.created_at
+            };
+
+            console.log(`Sending Telegram notification for trade ${trade.id}`);
+            
+            const { data: notificationResult, error: notificationError } = await supabase.functions.invoke('telegram-notifications', {
+              body: notificationData
+            });
+
+            if (notificationError) {
+              console.error('Failed to send Telegram notification:', notificationError);
+            } else {
+              console.log('Telegram notification sent successfully:', notificationResult);
+            }
+          } catch (notificationError) {
+            console.error('Error sending Telegram notification:', notificationError);
+          }
+          
           return trade;
         }
       } catch (error) {
