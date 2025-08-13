@@ -53,7 +53,7 @@ ALGORITHMIC ASSISTANT REFERENCE:
 
 ENHANCED MARKET DATA:
 **Price Action:**
-- Symbol: ${symbol} | Current: ${currentData.currentPrice}
+- Symbol: ${symbol} | Current: ${currentData.currentPrice} ⚠️ USE THIS AS ENTRY PRICE
 - 24h: ${currentData.changePercent}% (High: ${currentData.high24h}, Low: ${currentData.low24h})
 
 **Technical Indicators:**
@@ -80,10 +80,10 @@ ENHANCED MARKET DATA:
 
 **EXPERT ANALYSIS FRAMEWORK:**
 1. **Technical Confluence:** Identify 3+ confirming signals from different indicator categories
-2. **Risk Management:** Ensure R:R ratio ≥ 1.5, position at logical S/R levels
+2. **Risk Management:** Ensure R:R ratio ≥ 2:1, position at logical S/R levels
 3. **Timing Precision:** Consider session volatility, news events, and momentum shifts
-4. **Entry Strategy:** Look for retracements, breakouts, or continuation patterns - NOT current price
-5. **Market Structure:** Respect major S/R levels and trend context
+4. **Entry Strategy:** ⚠️ MUST USE CURRENT MARKET PRICE for immediate execution
+5. **Market Structure:** Respect major S/R levels for stop loss and take profit placement
 
 **CONFIDENCE SCORING:**
 - 80-95%: Multiple strong confluences, clear direction, favorable session
@@ -95,7 +95,7 @@ Respond with ONLY this JSON structure:
 {
   "action": "BUY or SELL (must choose one - HOLD not allowed)",
   "confidence": "integer 20-95 based on technical confluence and market conditions",
-  "entry": "number - strategic entry at key technical level (NOT current price)",
+  "entry": "number - MUST BE CURRENT MARKET PRICE ${currentData.currentPrice} for immediate execution",
   "stopLoss": "number - logical stop beyond key level",
   "takeProfit": "number - target at next major S/R or 1.5+ R:R",
   "support": "number - most critical support you identify",
@@ -109,12 +109,14 @@ Respond with ONLY this JSON structure:
 }
 
 **CRITICAL REQUIREMENTS:**
-- Entry must be a STRATEGIC LEVEL where price is likely to reach, not current market price
-- Must justify confidence score with specific technical confluences
-- Risk/reward must be ≥ 1.5:1
+⚠️ AUTO-TRADING SYSTEM - IMMEDIATE EXECUTION REQUIRED ⚠️
+- Entry MUST be current market price ${currentData.currentPrice} for immediate execution
+- This is live auto-trading, not manual strategy - no limit orders
+- Must justify confidence score with specific technical confluences  
+- Risk/reward must be ≥ 2:1
 - Consider session timing and volatility in your analysis
 - Reference multiple timeframes if using 1H+4H strategy
-- Provide actionable, specific entry and confirmation criteria`;
+- Stop loss and take profit based on technical levels from current price`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
