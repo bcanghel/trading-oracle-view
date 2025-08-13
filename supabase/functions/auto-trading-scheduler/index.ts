@@ -249,6 +249,64 @@ serve(async (req) => {
       }
     };
 
+    // ============= LOT SIZE CALCULATION =============
+    const calculateLotSizeForTrade = (symbol: string, entryPrice: number, stopLoss: number): {
+      standardLot: number;
+      microLot: number;
+      riskAmount: number;
+      pipValue: number;
+      pipRisk: number;
+    } => {
+      const accountBalance = 10000; // $10,000 account
+      const riskPercentage = 1; // 1% risk
+      const leverage = 100; // 1:100 leverage
+      
+      // Calculate risk amount in USD
+      const riskAmount = accountBalance * (riskPercentage / 100);
+      
+      // Determine pip value and decimal place based on pair
+      const isJPYPair = symbol.includes('JPY');
+      const pipDecimal = isJPYPair ? 0.01 : 0.0001;
+      
+      // Standard forex pip values for major pairs (per standard lot)
+      const pipValues: { [key: string]: number } = {
+        'EUR/USD': 10, 'GBP/USD': 10, 'AUD/USD': 10, 'NZD/USD': 10,
+        'USD/JPY': 9.09, 'USD/CHF': 10.87, 'USD/CAD': 7.69,
+        'EUR/GBP': 12.87, 'EUR/JPY': 9.09, 'GBP/JPY': 9.09,
+        'DEFAULT': 10
+      };
+      
+      // Get pip value for this symbol
+      const cleanSymbol = symbol.replace(/\s/g, '').toUpperCase();
+      let pipValue = pipValues[cleanSymbol];
+      
+      // Try with forward slash if not found
+      if (!pipValue && !cleanSymbol.includes('/') && cleanSymbol.length === 6) {
+        const formattedSymbol = `${cleanSymbol.slice(0, 3)}/${cleanSymbol.slice(3)}`;
+        pipValue = pipValues[formattedSymbol];
+      }
+      
+      pipValue = pipValue || pipValues.DEFAULT;
+      
+      // Calculate pip difference
+      const pipRisk = Math.abs(entryPrice - stopLoss) / pipDecimal;
+      
+      // Calculate position size in standard lots
+      // Formula: Risk Amount / (Pip Risk × Pip Value) = Standard Lots
+      const standardLot = pipRisk > 0 ? riskAmount / (pipRisk * pipValue) : 0;
+      
+      // Convert to micro lots (1 standard lot = 1000 micro lots)
+      const microLot = standardLot * 1000;
+      
+      return {
+        standardLot: Number(standardLot.toFixed(3)),
+        microLot: Number(microLot.toFixed(0)),
+        riskAmount: Number(riskAmount.toFixed(2)),
+        pipValue,
+        pipRisk: Number(pipRisk.toFixed(1))
+      };
+    };
+
     const generateTradeForPair = async (symbol: string, sessionName: string) => {
       try {
         console.log(`Generating trade for ${symbol} - ${sessionName}`);
@@ -308,6 +366,20 @@ serve(async (req) => {
 
         console.log(`Attempting to create trade record for ${symbol} with userId: ${userId}`);
         
+        // Calculate lot sizes for this trade
+        const lotSizeInfo = calculateLotSizeForTrade(
+          symbol, 
+          analysis?.entry || marketData.currentData.currentPrice,
+          analysis?.stopLoss || 0
+        );
+        
+        console.log(`Lot size calculation for ${symbol}:`, {
+          standardLot: lotSizeInfo.standardLot,
+          microLot: lotSizeInfo.microLot,
+          riskAmount: lotSizeInfo.riskAmount,
+          pipRisk: lotSizeInfo.pipRisk
+        });
+        
         // Prepare trade data - only AI analysis trades
         const tradeData = {
           symbol,
@@ -323,7 +395,10 @@ serve(async (req) => {
           entry_price: analysis?.entry || marketData.currentData.currentPrice,
           stop_loss: analysis?.stopLoss || 0,
           take_profit: analysis?.takeProfit || 0,
-          lot_size: 0.01, // Standard lot size for auto trades
+          lot_size: lotSizeInfo.standardLot, // Calculated lot size
+          calculated_micro_lots: lotSizeInfo.microLot,
+          calculated_risk_amount: lotSizeInfo.riskAmount,
+          calculated_pip_risk: lotSizeInfo.pipRisk,
           next_check_at: nextCheck.toISOString()
         };
         
