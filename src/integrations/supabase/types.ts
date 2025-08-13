@@ -18,6 +18,9 @@ export type Database = {
         Row: {
           action: string
           ai_confidence: number | null
+          calculated_micro_lots: number | null
+          calculated_pip_risk: number | null
+          calculated_risk_amount: number | null
           closed_at: string | null
           created_at: string
           entry_price: number
@@ -40,6 +43,9 @@ export type Database = {
         Insert: {
           action: string
           ai_confidence?: number | null
+          calculated_micro_lots?: number | null
+          calculated_pip_risk?: number | null
+          calculated_risk_amount?: number | null
           closed_at?: string | null
           created_at?: string
           entry_price: number
@@ -62,6 +68,9 @@ export type Database = {
         Update: {
           action?: string
           ai_confidence?: number | null
+          calculated_micro_lots?: number | null
+          calculated_pip_risk?: number | null
+          calculated_risk_amount?: number | null
           closed_at?: string | null
           created_at?: string
           entry_price?: number
