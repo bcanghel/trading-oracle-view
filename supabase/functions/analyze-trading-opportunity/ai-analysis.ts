@@ -82,8 +82,8 @@ ENHANCED MARKET DATA:
 1. **Technical Confluence:** Identify 3+ confirming signals from different indicator categories
 2. **Risk Management:** Ensure R:R ratio ≥ 2:1, position at logical S/R levels
 3. **Timing Precision:** Consider session volatility, news events, and momentum shifts
-4. **Entry Strategy:** ⚠️ MUST USE CURRENT MARKET PRICE for immediate execution
-5. **Market Structure:** Respect major S/R levels for stop loss and take profit placement
+4. **Entry Strategy:** Choose optimal entry - current price for immediate execution OR strategic level for better R:R
+5. **Market Structure:** Use major S/R levels for entry, stop loss, and take profit placement
 
 **CONFIDENCE SCORING:**
 - 80-95%: Multiple strong confluences, clear direction, favorable session
@@ -95,7 +95,7 @@ Respond with ONLY this JSON structure:
 {
   "action": "BUY or SELL (must choose one - HOLD not allowed)",
   "confidence": "integer 20-95 based on technical confluence and market conditions",
-  "entry": "number - MUST BE CURRENT MARKET PRICE ${currentData.currentPrice} for immediate execution",
+  "entry": "number - optimal entry price (current: ${currentData.currentPrice} or strategic level)",
   "stopLoss": "number - logical stop beyond key level",
   "takeProfit": "number - target at next major S/R or 1.5+ R:R",
   "support": "number - most critical support you identify",
@@ -109,14 +109,12 @@ Respond with ONLY this JSON structure:
 }
 
 **CRITICAL REQUIREMENTS:**
-⚠️ AUTO-TRADING SYSTEM - IMMEDIATE EXECUTION REQUIRED ⚠️
-- Entry MUST be current market price ${currentData.currentPrice} for immediate execution
-- This is live auto-trading, not manual strategy - no limit orders
+- Choose entry price strategically: use current price (${currentData.currentPrice}) for immediate execution OR better technical level for improved R:R
 - Must justify confidence score with specific technical confluences  
 - Risk/reward must be ≥ 2:1
 - Consider session timing and volatility in your analysis
 - Reference multiple timeframes if using 1H+4H strategy
-- Stop loss and take profit based on technical levels from current price`;
+- Explain entry rationale: market vs limit order strategy`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',

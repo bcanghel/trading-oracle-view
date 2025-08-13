@@ -343,15 +343,9 @@ serve(async (req) => {
           confidence: analysis.confidence,
           entry: analysis.entry,
           currentPrice: marketData.currentData.currentPrice,
-          entryMatchesCurrent: Math.abs(analysis.entry - marketData.currentData.currentPrice) < 0.0001,
+          entryType: analysis.entry === marketData.currentData.currentPrice ? 'MARKET' : 'LIMIT',
           riskReward: analysis.riskReward
         } : 'null');
-        
-        // Validate that AI is using current market price for entry
-        if (analysis && Math.abs(analysis.entry - marketData.currentData.currentPrice) > 0.001) {
-          console.log(`⚠️ CORRECTING ENTRY PRICE: AI suggested ${analysis.entry}, using current market price ${marketData.currentData.currentPrice}`);
-          analysis.entry = marketData.currentData.currentPrice;
-        }
         
         // Only create trades if AI analysis succeeds
         if (!analysis || analysis.error) {
