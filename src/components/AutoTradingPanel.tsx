@@ -23,6 +23,10 @@ interface AutoTrade {
   created_at: string;
   closed_at?: string;
   next_check_at?: string;
+  lot_size?: number;
+  calculated_micro_lots?: number;
+  calculated_risk_amount?: number;
+  calculated_pip_risk?: number;
 }
 
 interface SessionConfig {
@@ -444,12 +448,17 @@ export function AutoTradingPanel() {
                       <div className="text-sm text-muted-foreground">{trade.session_name}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm">Entry: {trade.entry_price}</div>
-                    <div className="text-xs text-muted-foreground">
-                      SL: {trade.stop_loss} | TP: {trade.take_profit}
-                    </div>
-                  </div>
+                   <div className="text-right">
+                     <div className="text-sm">Entry: {trade.entry_price}</div>
+                     <div className="text-xs text-muted-foreground">
+                       SL: {trade.stop_loss} | TP: {trade.take_profit}
+                     </div>
+                     {(trade.calculated_micro_lots || trade.lot_size) && (
+                       <div className="text-xs text-blue-600 font-medium">
+                         Lot: {trade.lot_size || 0} ({trade.calculated_micro_lots || 0} micro)
+                       </div>
+                     )}
+                   </div>
                   <Badge variant="secondary">OPEN</Badge>
                 </div>
               ))
@@ -484,12 +493,17 @@ export function AutoTradingPanel() {
                       <div className="text-sm text-muted-foreground">{trade.session_name}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm">Entry: {trade.entry_price}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(trade.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
+                   <div className="text-right">
+                     <div className="text-sm">Entry: {trade.entry_price}</div>
+                     <div className="text-xs text-muted-foreground">
+                       {new Date(trade.created_at).toLocaleDateString()}
+                     </div>
+                     {(trade.calculated_micro_lots || trade.lot_size) && (
+                       <div className="text-xs text-blue-600 font-medium">
+                         Lot: {trade.lot_size || 0} ({trade.calculated_micro_lots || 0} micro)
+                       </div>
+                     )}
+                   </div>
                   <div className="text-right">
                     <Badge variant={getStatusBadgeVariant(trade.status)}>
                       {trade.status}
