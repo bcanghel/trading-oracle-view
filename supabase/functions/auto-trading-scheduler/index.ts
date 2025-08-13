@@ -273,6 +273,12 @@ serve(async (req) => {
         'EUR/USD': 10, 'GBP/USD': 10, 'AUD/USD': 10, 'NZD/USD': 10,
         'USD/JPY': 9.09, 'USD/CHF': 10.87, 'USD/CAD': 7.69,
         'EUR/GBP': 12.87, 'EUR/JPY': 9.09, 'GBP/JPY': 9.09,
+        'GBP/AUD': 6.85, 'EUR/AUD': 6.85, 'AUD/JPY': 9.09,
+        'AUD/CAD': 7.69, 'AUD/CHF': 10.87, 'AUD/NZD': 8.70,
+        'GBP/CAD': 7.69, 'GBP/CHF': 10.87, 'GBP/NZD': 8.70,
+        'EUR/CAD': 7.69, 'EUR/CHF': 10.87, 'EUR/NZD': 8.70,
+        'NZD/CAD': 7.69, 'NZD/CHF': 10.87, 'NZD/JPY': 9.09,
+        'CAD/CHF': 10.87, 'CAD/JPY': 9.09, 'CHF/JPY': 9.09,
         'DEFAULT': 10
       };
       
@@ -298,6 +304,18 @@ serve(async (req) => {
       // Convert to micro lots (1 standard lot = 1000 micro lots)
       const microLot = standardLot * 1000;
       
+      console.log(`Lot size calculation for ${symbol}:`, {
+        cleanSymbol,
+        entryPrice,
+        stopLoss,
+        pipDecimal,
+        pipRisk: pipRisk.toFixed(1),
+        pipValue,
+        riskAmount,
+        standardLot: standardLot.toFixed(3),
+        microLot: microLot.toFixed(0)
+      });
+
       return {
         standardLot: Number(standardLot.toFixed(3)),
         microLot: Number(microLot.toFixed(0)),
