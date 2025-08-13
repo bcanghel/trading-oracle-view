@@ -70,6 +70,7 @@ const PublicTrades = () => {
 
   const loadTrades = async () => {
     try {
+      console.log('Loading trades from public_auto_trades_stats...');
       const { data, error } = await supabase
         .from('public_auto_trades_stats')
         .select('*')
@@ -77,25 +78,39 @@ const PublicTrades = () => {
 
       if (error) {
         console.error('Error loading trades:', error);
+        throw error;
       } else {
+        console.log('Successfully loaded trades:', data?.length || 0, 'trades');
         setTrades(data || []);
       }
     } catch (error) {
-      console.error('Error loading trades:', error);
+      console.error('Failed to load trades:', error);
+      // Keep existing trades if fetch fails, don't clear the UI
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    console.log('PublicTrades component mounted, loading initial data...');
     loadTrades();
     setNextSession(getNextSessionTime());
     
-    const interval = setInterval(() => {
+    // Refresh data every 30 seconds to keep it current
+    const dataInterval = setInterval(() => {
+      console.log('Auto-refreshing trades data...');
+      loadTrades();
+    }, 30000);
+    
+    // Update next session time every minute
+    const timeInterval = setInterval(() => {
       setNextSession(getNextSessionTime());
-    }, 60000); // Update every minute
+    }, 60000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(dataInterval);
+      clearInterval(timeInterval);
+    };
   }, []);
 
   if (loading) {
