@@ -243,39 +243,56 @@ const PublicTrades = () => {
                 <p className="text-muted-foreground text-center py-4">No completed trades</p>
               ) : (
                 completedTrades.map((trade, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {trade.action === 'BUY' ? (
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-600" />
-                      )}
-                      <div>
-                        <div className="font-semibold">{trade.symbol}</div>
-                        <div className="text-sm text-muted-foreground">{trade.session_name}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm">Entry: {trade.entry_price}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {trade.created_at && new Date(trade.created_at).toLocaleDateString()}
-                      </div>
-                      {(trade.calculated_micro_lots || trade.lot_size) && (
-                        <div className="text-xs text-blue-600 font-medium">
-                          Lot: {trade.lot_size || 0} ({trade.calculated_micro_lots || 0} micro)
+                  <div key={index} className="border rounded-lg p-4 space-y-3">
+                    {/* Header with symbol, action and result */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {trade.action === 'BUY' ? (
+                          <TrendingUp className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-5 w-5 text-red-600" />
+                        )}
+                        <div>
+                          <div className="font-bold text-lg">{trade.symbol}</div>
+                          <div className="text-sm text-muted-foreground">{trade.session_name}</div>
                         </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <Badge variant={getStatusBadgeVariant(trade.status)}>
-                        {trade.status}
-                      </Badge>
-                      <div className={`text-sm font-semibold ${
-                        (trade.pips_result || 0) >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {(trade.pips_result || 0) > 0 ? '+' : ''}{trade.pips_result} pips
+                      </div>
+                      <div className="text-right">
+                        <Badge variant={getStatusBadgeVariant(trade.status)} className="mb-1">
+                          {trade.status}
+                        </Badge>
+                        <div className={`text-lg font-bold ${
+                          (trade.pips_result || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {(trade.pips_result || 0) > 0 ? '+' : ''}{trade.pips_result} pips
+                        </div>
                       </div>
                     </div>
+                    
+                    {/* Trade details */}
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                      <div>
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Entry Price</div>
+                        <div className="font-semibold text-base">{trade.entry_price}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Date</div>
+                        <div className="font-semibold text-base">
+                          {trade.created_at && new Date(trade.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Lot size information */}
+                    {(trade.calculated_micro_lots || trade.lot_size) && (
+                      <div className="flex justify-center sm:justify-start">
+                        <div className="bg-blue-50 dark:bg-blue-950 px-3 py-1 rounded-full">
+                          <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                            Lot: {trade.lot_size || 0} ({trade.calculated_micro_lots || 0} micro)
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
