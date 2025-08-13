@@ -207,7 +207,63 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_auto_trades_stats: {
+        Row: {
+          action: string | null
+          ai_confidence: number | null
+          calculated_micro_lots: number | null
+          calculated_pip_risk: number | null
+          calculated_risk_amount: number | null
+          closed_at: string | null
+          created_at: string | null
+          entry_price: number | null
+          lot_size: number | null
+          pips_result: number | null
+          risk_reward_ratio: number | null
+          session_name: string | null
+          status: string | null
+          stop_loss: number | null
+          symbol: string | null
+          take_profit: number | null
+        }
+        Insert: {
+          action?: string | null
+          ai_confidence?: number | null
+          calculated_micro_lots?: number | null
+          calculated_pip_risk?: number | null
+          calculated_risk_amount?: number | null
+          closed_at?: string | null
+          created_at?: string | null
+          entry_price?: number | null
+          lot_size?: number | null
+          pips_result?: number | null
+          risk_reward_ratio?: number | null
+          session_name?: string | null
+          status?: string | null
+          stop_loss?: number | null
+          symbol?: string | null
+          take_profit?: number | null
+        }
+        Update: {
+          action?: string | null
+          ai_confidence?: number | null
+          calculated_micro_lots?: number | null
+          calculated_pip_risk?: number | null
+          calculated_risk_amount?: number | null
+          closed_at?: string | null
+          created_at?: string | null
+          entry_price?: number | null
+          lot_size?: number | null
+          pips_result?: number | null
+          risk_reward_ratio?: number | null
+          session_name?: string | null
+          status?: string | null
+          stop_loss?: number | null
+          symbol?: string | null
+          take_profit?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
