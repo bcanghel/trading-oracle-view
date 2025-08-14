@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertTriangle, Eye, EyeOff, History, Trash2, Clock, Info, Timer } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, AlertTriangle, Eye, EyeOff, History, Trash2, Clock, Info, Timer, Calculator } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchMarketData, analyzeTradingOpportunity } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ import UserMenu from "@/components/UserMenu";
 import { MarketSessions } from "@/components/MarketSessions";
 import { AutoTradingPanel } from "@/components/AutoTradingPanel";
 import { MT5Integration } from "@/components/MT5Integration";
+import { LotSizeCalculator } from "@/components/LotSizeCalculator";
 
 interface TradingRecommendation {
   action: 'BUY' | 'SELL';
@@ -617,10 +618,14 @@ export function TradingDashboard() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="analysis" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="analysis" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Market Analysis
+            </TabsTrigger>
+            <TabsTrigger value="calculator" className="flex items-center gap-2">
+              <Calculator className="h-4 w-4" />
+              Lot Calculator
             </TabsTrigger>
             <TabsTrigger value="auto-trading" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
@@ -1302,6 +1307,10 @@ export function TradingDashboard() {
             )}
           </Card>
         )}
+          </TabsContent>
+
+          <TabsContent value="calculator">
+            <LotSizeCalculator />
           </TabsContent>
 
           <TabsContent value="auto-trading">
