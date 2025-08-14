@@ -7,18 +7,21 @@ const corsHeaders = {
 };
 
 interface TradeNotification {
-  tradeId: string;
+  trade_id: string;
   symbol: string;
   action: string;
   entry_price: number;
   stop_loss: number;
   take_profit: number;
-  session_name: string;
-  status: string;
+  order_type?: string;
+  confidence?: number;
+  session: string;
+  notification_type: string;
+  status?: string;
   pips_result?: number;
   ai_confidence?: number;
   risk_reward_ratio?: number;
-  created_at: string;
+  created_at?: string;
   closed_at?: string;
 }
 
@@ -57,8 +60,10 @@ async function sendTelegramMessage(chatId: number, text: string, parseMode = 'HT
 }
 
 async function formatTradeOpenMessage(trade: TradeNotification): Promise<string> {
-  const confidenceEmoji = trade.ai_confidence && trade.ai_confidence > 0.8 ? '🔥' : '📊';
+  const confidence = trade.confidence || trade.ai_confidence || 0;
+  const confidenceEmoji = confidence > 0.8 ? '🔥' : '📊';
   const actionEmoji = trade.action === 'BUY' ? '🟢' : '🔴';
+  const orderTypeEmoji = trade.order_type === 'LIMIT' ? '⏳' : '⚡';
   
   // Calculate lot sizes for different accounts
   let lotSizeInfo = '';
@@ -91,17 +96,18 @@ async function formatTradeOpenMessage(trade: TradeNotification): Promise<string>
     lotSizeInfo = '\n⚠️ <i>Lot size calculation unavailable</i>\n';
   }
   
-  return `${confidenceEmoji} <b>NEW TRADE SIGNAL</b> ${actionEmoji}\n\n` +
+  return `${confidenceEmoji} <b>NEW TRADE SIGNAL</b> ${actionEmoji} ${orderTypeEmoji}\n\n` +
     `💱 <b>Pair:</b> ${trade.symbol}\n` +
     `📈 <b>Action:</b> ${trade.action}\n` +
     `💰 <b>Entry:</b> ${trade.entry_price}\n` +
     `🛑 <b>Stop Loss:</b> ${trade.stop_loss}\n` +
     `🎯 <b>Take Profit:</b> ${trade.take_profit}\n` +
-    `⏰ <b>Session:</b> ${trade.session_name}\n` +
-    `🎲 <b>Confidence:</b> ${trade.ai_confidence ? (trade.ai_confidence * 100).toFixed(1) + '%' : 'N/A'}\n` +
+    `${orderTypeEmoji} <b>Order Type:</b> ${trade.order_type || 'MARKET'}\n` +
+    `⏰ <b>Session:</b> ${trade.session}\n` +
+    `🎲 <b>Confidence:</b> ${confidence > 0 ? (confidence * 100).toFixed(1) + '%' : 'N/A'}\n` +
     `📊 <b>Risk/Reward:</b> ${trade.risk_reward_ratio ? `1:${trade.risk_reward_ratio.toFixed(2)}` : 'N/A'}` +
     lotSizeInfo +
-    `\n🚀 Trade opened at ${new Date(trade.created_at).toLocaleString()}`;
+    `\n🚀 Trade opened at ${new Date().toLocaleString()}`;
 }
 
 function formatTradeCloseMessage(trade: TradeNotification): string {
@@ -113,8 +119,8 @@ function formatTradeCloseMessage(trade: TradeNotification): string {
     `📈 <b>Action:</b> ${trade.action}\n` +
     `💰 <b>Entry:</b> ${trade.entry_price}\n` +
     `📊 <b>Result:</b> ${pipsText}\n` +
-    `⏰ <b>Session:</b> ${trade.session_name}\n` +
-    `🕐 <b>Duration:</b> ${calculateTradeDuration(trade.created_at, trade.closed_at)}\n\n` +
+    `⏰ <b>Session:</b> ${trade.session}\n` +
+    `🕐 <b>Duration:</b> ${calculateTradeDuration(trade.created_at || '', trade.closed_at)}\n\n` +
     `${trade.pips_result && trade.pips_result > 0 ? '🎉 Profitable trade!' : '💪 Better luck next time!'}`;
 }
 
@@ -188,7 +194,7 @@ serve(async (req) => {
     const notification: TradeNotification = await req.json();
     console.log('Received trade notification:', JSON.stringify(notification, null, 2));
 
-    const { tradeId, symbol, status } = notification;
+    const { trade_id, symbol, notification_type } = notification;
     
     // Get subscribers for this pair
     const subscriberChatIds = await getSubscribersForPair(symbol);
@@ -201,19 +207,19 @@ serve(async (req) => {
       );
     }
 
-    // Format message based on status
+    // Format message based on notification_type
     let message: string;
-    let notificationType: string;
+    let logNotificationType: string;
 
-    if (status === 'OPEN') {
+    if (notification_type === 'trade_opened') {
       message = await formatTradeOpenMessage(notification);
-      notificationType = 'TRADE_OPEN';
-    } else if (status === 'CLOSED') {
+      logNotificationType = 'TRADE_OPEN';
+    } else if (notification_type === 'trade_closed') {
       message = formatTradeCloseMessage(notification);
-      notificationType = 'TRADE_CLOSE';
+      logNotificationType = 'TRADE_CLOSE';
     } else {
-      message = formatTradeOpenMessage(notification); // Default to open format
-      notificationType = 'TRADE_UPDATE';
+      message = await formatTradeOpenMessage(notification); // Default to open format
+      logNotificationType = 'TRADE_UPDATE';
     }
 
     // Send notifications to all subscribers
@@ -224,9 +230,9 @@ serve(async (req) => {
         // Log the notification
         await logNotification(
           chatId,
-          tradeId,
+          trade_id,
           message,
-          notificationType,
+          logNotificationType,
           result.success,
           result.messageId,
           result.error
