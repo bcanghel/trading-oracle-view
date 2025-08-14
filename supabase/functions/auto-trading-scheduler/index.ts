@@ -246,6 +246,50 @@ serve(async (req) => {
 
       if (error) {
         console.error(`Failed to close trade ${trade.id}:`, error);
+        return;
+      }
+
+      // Send telegram notification for trade closure
+      try {
+        const notificationData = {
+          trade_id: trade.id,
+          symbol: trade.symbol,
+          action: trade.action,
+          entry_price: trade.entry_price,
+          stop_loss: trade.stop_loss,
+          take_profit: trade.take_profit,
+          order_type: trade.order_type || 'MARKET',
+          confidence: trade.ai_confidence,
+          session: trade.session_name,
+          notification_type: 'trade_closed',
+          status: status,
+          pips_result: pipsResult,
+          ai_confidence: trade.ai_confidence,
+          risk_reward_ratio: trade.risk_reward_ratio,
+          created_at: trade.created_at,
+          closed_at: new Date().toISOString()
+        };
+
+        console.log(`Sending telegram notification for closed trade ${trade.id}`);
+        
+        const notificationResponse = await fetch('https://cgmzxonyaiwtcyxmmhsi.supabase.co/functions/v1/telegram-notifications', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(notificationData)
+        });
+
+        if (!notificationResponse.ok) {
+          const errorText = await notificationResponse.text();
+          console.error(`Failed to send telegram notification for trade ${trade.id}:`, errorText);
+        } else {
+          const result = await notificationResponse.json();
+          console.log(`Telegram notification sent for trade ${trade.id}:`, result);
+        }
+      } catch (notificationError) {
+        console.error(`Error sending telegram notification for trade ${trade.id}:`, notificationError);
       }
     };
 
@@ -621,6 +665,49 @@ serve(async (req) => {
               console.error(`Failed to update trade ${trade.id}:`, updateError);
             } else {
               console.log(`Trade ${trade.id} closed: ${tradeStatus} with ${pipsResult} pips`);
+              
+              // Send telegram notification for trade closure
+              try {
+                const notificationData = {
+                  trade_id: trade.id,
+                  symbol: trade.symbol,
+                  action: trade.action,
+                  entry_price: trade.entry_price,
+                  stop_loss: trade.stop_loss,
+                  take_profit: trade.take_profit,
+                  order_type: trade.order_type || 'MARKET',
+                  confidence: trade.ai_confidence,
+                  session: trade.session_name,
+                  notification_type: 'trade_closed',
+                  status: tradeStatus,
+                  pips_result: pipsResult,
+                  ai_confidence: trade.ai_confidence,
+                  risk_reward_ratio: trade.risk_reward_ratio,
+                  created_at: trade.created_at,
+                  closed_at: new Date().toISOString()
+                };
+
+                console.log(`Sending telegram notification for closed trade ${trade.id}`);
+                
+                const notificationResponse = await fetch('https://cgmzxonyaiwtcyxmmhsi.supabase.co/functions/v1/telegram-notifications', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(notificationData)
+                });
+
+                if (!notificationResponse.ok) {
+                  const errorText = await notificationResponse.text();
+                  console.error(`Failed to send telegram notification for trade ${trade.id}:`, errorText);
+                } else {
+                  const result = await notificationResponse.json();
+                  console.log(`Telegram notification sent for trade ${trade.id}:`, result);
+                }
+              } catch (notificationError) {
+                console.error(`Error sending telegram notification for trade ${trade.id}:`, notificationError);
+              }
             }
           } else {
             // Update next check time
