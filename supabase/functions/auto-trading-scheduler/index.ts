@@ -294,25 +294,26 @@ serve(async (req) => {
     };
 
     // ============= LOT SIZE CALCULATION =============
-    const calculateLotSizeForTrade = (symbol: string, entryPrice: number, stopLoss: number): {
+    const calculateLotSizeForTrade = (symbol: string, entryPrice: number, stopLoss: number, accountSize: number = 10000): {
       standardLot: number;
       microLot: number;
       riskAmount: number;
       pipValue: number;
       pipRisk: number;
+      expectedProfitUSD: number;
+      expectedRiskUSD: number;
     } => {
-      const accountBalance = 10000; // $10,000 account
       const riskPercentage = 1; // 1% risk
       const leverage = 100; // 1:100 leverage
       
-      // Calculate risk amount in USD
-      const riskAmount = accountBalance * (riskPercentage / 100);
+      // Calculate risk amount in USD - THIS IS THE KEY CALCULATION
+      const riskAmount = accountSize * (riskPercentage / 100); // $100 for $10K, $250 for $25K
       
       // Determine pip value and decimal place based on pair
       const isJPYPair = symbol.includes('JPY');
       const pipDecimal = isJPYPair ? 0.01 : 0.0001;
       
-      // Standard forex pip values for major pairs (per standard lot)
+      // Standard forex pip values for major pairs (per standard lot) in USD
       const pipValues: { [key: string]: number } = {
         'EUR/USD': 10, 'GBP/USD': 10, 'AUD/USD': 10, 'NZD/USD': 10,
         'USD/JPY': 9.09, 'USD/CHF': 10.87, 'USD/CAD': 7.69,
@@ -338,15 +339,19 @@ serve(async (req) => {
       
       pipValue = pipValue || pipValues.DEFAULT;
       
-      // Calculate pip difference
+      // Calculate pip difference (risk in pips)
       const pipRisk = Math.abs(entryPrice - stopLoss) / pipDecimal;
       
       // Calculate position size in standard lots
-      // Formula: Risk Amount / (Pip Risk × Pip Value) = Standard Lots
+      // Formula: Risk Amount USD / (Pip Risk × Pip Value USD) = Standard Lots
       const standardLot = pipRisk > 0 ? riskAmount / (pipRisk * pipValue) : 0;
       
       // Convert to micro lots (1 standard lot = 1000 micro lots)
       const microLot = standardLot * 1000;
+      
+      // Calculate expected profit/loss in USD based on 2:1 RR
+      const expectedRiskUSD = riskAmount; // This should equal our 1% risk
+      const expectedProfitUSD = riskAmount * 2; // 2:1 RR = 2% profit
       
       console.log(`Lot size calculation for ${symbol}:`, {
         cleanSymbol,
@@ -365,7 +370,9 @@ serve(async (req) => {
         microLot: Number(microLot.toFixed(0)),
         riskAmount: Number(riskAmount.toFixed(2)),
         pipValue,
-        pipRisk: Number(pipRisk.toFixed(1))
+        pipRisk: Number(pipRisk.toFixed(1)),
+        expectedProfitUSD: Number(expectedProfitUSD.toFixed(2)),
+        expectedRiskUSD: Number(expectedRiskUSD.toFixed(2))
       };
     };
 
@@ -452,18 +459,37 @@ serve(async (req) => {
 
         console.log(`Attempting to create trade record for ${symbol} with userId: ${userId}`);
         
-        // Calculate lot sizes for this trade
-        const lotSizeInfo = calculateLotSizeForTrade(
+        // Calculate lot sizes for this trade (for $10K account)
+        const lotSizeInfo10K = calculateLotSizeForTrade(
           symbol, 
           analysis?.entry || marketData.currentData.currentPrice,
-          analysis?.stopLoss || 0
+          analysis?.stopLoss || 0,
+          10000 // $10K account
         );
         
-        console.log(`Lot size calculation for ${symbol}:`, {
-          standardLot: lotSizeInfo.standardLot,
-          microLot: lotSizeInfo.microLot,
-          riskAmount: lotSizeInfo.riskAmount,
-          pipRisk: lotSizeInfo.pipRisk
+        // Calculate lot sizes for $25K account for comparison
+        const lotSizeInfo25K = calculateLotSizeForTrade(
+          symbol, 
+          analysis?.entry || marketData.currentData.currentPrice,
+          analysis?.stopLoss || 0,
+          25000 // $25K account
+        );
+        
+        console.log(`Risk Management Analysis for ${symbol}:`, {
+          '10K_Account': {
+            standardLot: lotSizeInfo10K.standardLot,
+            microLot: lotSizeInfo10K.microLot,
+            riskUSD: lotSizeInfo10K.expectedRiskUSD,
+            profitUSD: lotSizeInfo10K.expectedProfitUSD,
+            pipRisk: lotSizeInfo10K.pipRisk
+          },
+          '25K_Account': {
+            standardLot: lotSizeInfo25K.standardLot,
+            microLot: lotSizeInfo25K.microLot,
+            riskUSD: lotSizeInfo25K.expectedRiskUSD,
+            profitUSD: lotSizeInfo25K.expectedProfitUSD,
+            pipRisk: lotSizeInfo25K.pipRisk
+          }
         });
         
         // Prepare trade data with new order type fields
@@ -484,10 +510,10 @@ serve(async (req) => {
           entry_price: analysis?.entry || marketData.currentData.currentPrice,
           stop_loss: analysis?.stopLoss || 0,
           take_profit: analysis?.takeProfit || 0,
-          lot_size: lotSizeInfo.standardLot,
-          calculated_micro_lots: lotSizeInfo.microLot,
-          calculated_risk_amount: lotSizeInfo.riskAmount,
-          calculated_pip_risk: lotSizeInfo.pipRisk,
+          lot_size: lotSizeInfo10K.standardLot, // Use $10K account as default
+          calculated_micro_lots: lotSizeInfo10K.microLot,
+          calculated_risk_amount: lotSizeInfo10K.riskAmount,
+          calculated_pip_risk: lotSizeInfo10K.pipRisk,
           next_check_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()
         };
         

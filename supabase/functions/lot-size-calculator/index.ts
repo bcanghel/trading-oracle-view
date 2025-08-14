@@ -143,19 +143,43 @@ function calculateMultipleAccounts(
     accountCurrency: 'USD'
   };
 
+  const calc10k = calculateLotSize({
+    ...baseParams,
+    accountBalance: 10000
+  });
+  
+  const calc25k = calculateLotSize({
+    ...baseParams,
+    accountBalance: 25000
+  });
+
+  // Log the risk verification
+  console.log('Risk Management Verification:', {
+    '10K_Account': {
+      accountBalance: 10000,
+      riskPercentage: riskPercentage,
+      expectedRiskUSD: 10000 * (riskPercentage / 100),
+      calculatedRiskUSD: calc10k.riskAmount,
+      expectedProfitUSD: 10000 * (riskPercentage / 100) * 2, // 2:1 RR
+      match: Math.abs(calc10k.riskAmount - (10000 * (riskPercentage / 100))) < 0.01
+    },
+    '25K_Account': {
+      accountBalance: 25000,
+      riskPercentage: riskPercentage,
+      expectedRiskUSD: 25000 * (riskPercentage / 100),
+      calculatedRiskUSD: calc25k.riskAmount,
+      expectedProfitUSD: 25000 * (riskPercentage / 100) * 2, // 2:1 RR
+      match: Math.abs(calc25k.riskAmount - (25000 * (riskPercentage / 100))) < 0.01
+    }
+  });
+
   return {
     symbol,
     entryPrice,
     stopLoss,
     calculations: {
-      account10k: calculateLotSize({
-        ...baseParams,
-        accountBalance: 10000
-      }),
-      account25k: calculateLotSize({
-        ...baseParams,
-        accountBalance: 25000
-      })
+      account10k: calc10k,
+      account25k: calc25k
     }
   };
 }
