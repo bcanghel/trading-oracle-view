@@ -151,12 +151,19 @@ async function getSubscribersForPair(symbol: string): Promise<number[]> {
     return [];
   }
 
-  return subscribers
-    .filter(sub => 
-      sub.subscribed_pairs.length === 0 || // Empty array means all pairs
-      sub.subscribed_pairs.includes(symbol)
-    )
-    .map(sub => sub.chat_id);
+  const normalize = (s: string) => s.replace(/[^A-Za-z]/g, '').toUpperCase();
+  const target = normalize(symbol);
+
+  const chatIds = (subscribers || [])
+    .filter((sub: any) => {
+      const pairs: string[] = Array.isArray(sub.subscribed_pairs) ? sub.subscribed_pairs : [];
+      if (pairs.length === 0) return true; // Empty or null means all pairs
+      return pairs.some((p) => normalize(p) === target);
+    })
+    .map((sub: any) => sub.chat_id);
+
+  console.log(`Matched ${chatIds.length}/${subscribers?.length ?? 0} subscribers for ${symbol} (norm: ${target})`);
+  return chatIds;
 }
 
 async function logNotification(
