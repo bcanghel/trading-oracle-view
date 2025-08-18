@@ -76,8 +76,36 @@ export function AutoTradingPanel() {
     }));
   };
 
+  const getRomaniaDay = () => {
+    const romaniaTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
+    return romaniaTime.getDay(); // 0=Sun ... 6=Sat
+  };
+
   const getNextSessionTime = () => {
     const currentHour = getRomaniaHour();
+    const roNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
+    const day = roNow.getDay();
+
+    // If in blackout window (Fri 19:00 -> Mon 10:00), next is Monday London session at 10:00
+    const isWeekend = day === 0 || day === 6; // Sun or Sat
+    const isFridayBlackout = day === 5 && currentHour >= 19;
+    const isMondayBeforeLondon = day === 1 && currentHour < 10;
+    if (isWeekend || isFridayBlackout || isMondayBeforeLondon) {
+      const nextTime = new Date(roNow);
+      if (day === 1 && currentHour < 10) {
+        nextTime.setHours(10, 0, 0, 0);
+      } else {
+        const daysUntilMonday = ((1 - day + 7) % 7) || 7; // days to next Monday
+        nextTime.setDate(nextTime.getDate() + daysUntilMonday);
+        nextTime.setHours(10, 0, 0, 0);
+      }
+      return {
+        session: 'London Session',
+        time: nextTime,
+        pairs: SESSION_CONFIGS.find(s => s.name === 'London Session')?.pairs || []
+      };
+    }
+    
     const today = new Date();
     
     for (const session of SESSION_CONFIGS) {
@@ -203,6 +231,16 @@ export function AutoTradingPanel() {
       timeZone: 'Europe/Bucharest',
       minute: '2-digit'
     }));
+    const day = getRomaniaDay();
+    
+    // Block trading from Friday 19:00 Romania through Monday 10:00 Romania
+    const isWeekend = day === 0 || day === 6;
+    const isFridayBlackout = day === 5 && currentHour >= 19;
+    const isMondayBeforeLondon = day === 1 && currentHour < 10;
+    if (isWeekend || isFridayBlackout || isMondayBeforeLondon) {
+      setIsGeneratingTrade(false);
+      return;
+    }
     
     // Generate trades within first 15 minutes of session start
     const activeSession = SESSION_CONFIGS.find(session => 

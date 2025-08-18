@@ -61,6 +61,11 @@ serve(async (req) => {
       }));
     };
 
+    const getRomaniaDay = () => {
+      const romaniaTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
+      return romaniaTime.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+    };
+
     const calculatePips = (entry: number, current: number, action: 'BUY' | 'SELL', symbol: string) => {
       const pipMultiplier = symbol.includes('JPY') ? 100 : 10000;
       const difference = action === 'BUY' ? current - entry : entry - current;
@@ -754,8 +759,18 @@ serve(async (req) => {
     const generateSessionTrades = async () => {
       const currentHour = getRomaniaHour();
       const currentMinute = getRomaniaMinute();
+      const day = getRomaniaDay();
       
-      console.log(`Current time: ${currentHour}:${currentMinute} Romania time`);
+      console.log(`Current time: ${currentHour}:${currentMinute} Romania time (day: ${day})`);
+      
+      // Block trading from Friday 19:00 Romania through Monday 10:00 Romania
+      const isWeekend = day === 0 || day === 6; // Sun or Sat
+      const isFridayBlackout = day === 5 && currentHour >= 19;
+      const isMondayBeforeLondon = day === 1 && currentHour < 10;
+      if (isWeekend || isFridayBlackout || isMondayBeforeLondon) {
+        console.log('Weekend/blackout window - skipping trade generation');
+        return;
+      }
       
       // For testing: analyze trades but only create if they meet criteria
       const testBody = await req.json();
@@ -779,7 +794,7 @@ serve(async (req) => {
               }
             } catch (error) {
               console.error(`💥 ERROR analyzing ${symbol}:`, error);
-              results.push({ symbol, status: 'ERROR', error: error.message });
+              results.push({ symbol, status: 'ERROR', error: (error as Error).message });
             }
           }
           
