@@ -1,11 +1,11 @@
-export const fetchMarketData = async (symbol: string, strategy: string = '1H') => {
+export const fetchMarketData = async (symbol: string, strategy: string = '1H', useDeterministic: boolean = false) => {
   const response = await fetch('https://cgmzxonyaiwtcyxmmhsi.supabase.co/functions/v1/fetch-market-data', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNnbXp4b255YWl3dGN5eG1taHNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5NzA2MzYsImV4cCI6MjA2NzU0NjYzNn0.jv5vMtuiLSmJijipBAVlTwjzXp123IDBA9kslT9kQEM`
     },
-    body: JSON.stringify({ symbol, strategy })
+    body: JSON.stringify({ symbol, strategy, useDeterministic })
   });
 
   if (!response.ok) {
@@ -15,14 +15,22 @@ export const fetchMarketData = async (symbol: string, strategy: string = '1H') =
   return response.json();
 };
 
-export const analyzeTradingOpportunity = async (symbol: string, historicalData: any[], currentData: any, historical4hData: any[] | null = null, strategy: string = '1H') => {
+export const analyzeTradingOpportunity = async (
+  symbol: string, 
+  historicalData: any[], 
+  currentData: any, 
+  historical4hData: any[] | null = null, 
+  strategy: string = '1H',
+  options: { useDeterministic?: boolean; historical1dData?: any[] | null } = {}
+) => {
+  const { useDeterministic = false, historical1dData = null } = options;
   const response = await fetch('https://cgmzxonyaiwtcyxmmhsi.supabase.co/functions/v1/analyze-trading-opportunity', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNnbXp4b255YWl3dGN5eG1taHNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5NzA2MzYsImV4cCI6MjA2NzU0NjYzNn0.jv5vMtuiLSmJijipBAVlTwjzXp123IDBA9kslT9kQEM`
     },
-    body: JSON.stringify({ symbol, historicalData, currentData, historical4hData, strategy })
+    body: JSON.stringify({ symbol, historicalData, currentData, historical4hData, historical1dData, strategy, useDeterministic })
   });
 
   if (!response.ok) {

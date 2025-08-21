@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import UserMenu from "@/components/UserMenu";
 import { MarketSessions } from "@/components/MarketSessions";
 import { AutoTradingPanel } from "@/components/AutoTradingPanel";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface TradingRecommendation {
   action: 'BUY' | 'SELL';
@@ -66,6 +68,7 @@ export function TradingDashboard() {
   const { toast } = useToast();
   const [selectedPair, setSelectedPair] = useState<string>("");
   const [selectedStrategy, setSelectedStrategy] = useState<string>("1H");
+  const [useDeterministic, setUseDeterministic] = useState<boolean>(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [recommendation, setRecommendation] = useState<TradingRecommendation | null>(null);
@@ -402,19 +405,20 @@ export function TradingDashboard() {
     setIsAnalyzing(true);
     try {
       // Get market data
-      const data = await fetchMarketData(selectedPair, selectedStrategy);
+      const data = await fetchMarketData(selectedPair, selectedStrategy, useDeterministic);
       setMarketData(data.currentData);
       setHistoricalData(data.historicalData);
       setHistorical4hData(data.historical4hData || []);
       setCurrentStrategy(data.strategy || selectedStrategy);
 
-      // Get AI analysis
+      // Get analysis (AI or deterministic)
       const analysis = await analyzeTradingOpportunity(
         selectedPair,
         data.historicalData,
         data.currentData,
         data.historical4hData,
-        selectedStrategy
+        selectedStrategy,
+        { useDeterministic, historical1dData: data.historical1dData }
       );
 
       // Check if AI analysis failed
@@ -681,6 +685,10 @@ export function TradingDashboard() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                    <div className="flex items-center gap-2 pt-1">
+                      <Switch id="deterministic" checked={useDeterministic} onCheckedChange={setUseDeterministic} />
+                      <Label htmlFor="deterministic" className="text-sm text-muted-foreground">Deterministic mode</Label>
+                    </div>
                   </div>
                   <div className="col-span-1 sm:col-span-2 lg:col-span-1 space-y-2 lg:space-y-0">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
