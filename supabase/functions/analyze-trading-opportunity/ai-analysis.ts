@@ -36,6 +36,9 @@ export async function analyzeWithAI(
 ` : '';
 
   const strategyNote = strategy === '1H+4H' ? 'This analysis uses ENHANCED MULTI-TIMEFRAME strategy (1H + 4H)' : 'This analysis uses STANDARD 1H strategy';
+  
+  // Include enhanced features as compact JSON for the model to parse easily
+  const enhancedJson = JSON.stringify(technicalAnalysis?.enhancedFeatures ?? {}, null, 2);
 
   const analysisPrompt = `
 You are an expert forex trading analyst with 15+ years of experience. Analyze ${symbol} and provide a strategic trading recommendation.
@@ -65,6 +68,9 @@ ENHANCED MARKET DATA:
 - Pivots: R1=${technicalAnalysis.pivotPoints?.r1}, Pivot=${technicalAnalysis.pivotPoints?.pivot}, S1=${technicalAnalysis.pivotPoints?.s1}
 - Fibonacci: 23.6%=${technicalAnalysis.fibonacci?.level236}, 38.2%=${technicalAnalysis.fibonacci?.level382}, 61.8%=${technicalAnalysis.fibonacci?.level618}
 - Swings: High=${technicalAnalysis.swingLevels?.swingHigh}, Low=${technicalAnalysis.swingLevels?.swingLow}
+
+**Enhanced Features (JSON):**
+${enhancedJson}
 
 **Trend & Pattern Analysis:**
 - Trend: ${trendAnalysis.overallTrend} (Strength: ${trendAnalysis.trendStrength})
@@ -128,8 +134,8 @@ Respond with ONLY this JSON structure:
         { role: 'system', content: 'You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.' },
         { role: 'user', content: analysisPrompt }
       ],
-      temperature: 0.2, // Slightly increased for more nuanced analysis
-      max_tokens: 2000,
+      // temperature removed for GPT-4.1+
+      max_completion_tokens: 2000,
       response_format: { type: "json_object" },
     }),
   });
