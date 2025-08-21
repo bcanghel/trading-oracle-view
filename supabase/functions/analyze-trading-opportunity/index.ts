@@ -16,71 +16,103 @@ serve(async (req) => {
   }
 
   try {
-    const { symbol, historicalData, currentData, historical4hData = null, strategy = '1H' } = await req.json();
+    const { symbol, historicalData, currentData, historical4hData = null, historical1dData = null, strategy = '1H', useDeterministic = false } = await req.json();
 
-    // Calculate technical indicators and trend analysis
-    let technicalAnalysis, trendAnalysis, technicalAnalysis4h = null, trendAnalysis4h = null;
+    // Enhanced analysis with new features
+    const sessionContext = currentData.sessionContext || {};
+    const currentPrice = parseFloat(currentData.currentPrice || currentData.close || 0);
     
-    if (strategy === '1H+4H' && historical4hData) {
-      // Calculate for both timeframes
-      technicalAnalysis = calculateTechnicalIndicators(historicalData);
-      trendAnalysis = analyzeTrend(historicalData);
-      technicalAnalysis4h = calculateTechnicalIndicators(historical4hData);
-      trendAnalysis4h = analyzeTrend(historical4hData);
-      
-      // Merge analyses for multi-timeframe confidence
-      technicalAnalysis.multiTimeframe = {
-        confluence: calculateTimeframeConfluence(technicalAnalysis, technicalAnalysis4h),
-        higher4h: technicalAnalysis4h,
-        agreement: checkTrendAgreement(trendAnalysis, trendAnalysis4h)
-      };
-    } else {
-      // Original 1H strategy
-      technicalAnalysis = calculateTechnicalIndicators(historicalData);
-      trendAnalysis = analyzeTrend(historicalData);
-    }
-    
-    // Get current Romania time and market session info
-    const romaniaTime = new Date();
-    const romaniaHour = (romaniaTime.getUTCHours() + 2) % 24; // Romania is UTC+2 (UTC+3 in summer)
-    const marketSession = getMarketSession(romaniaHour);
-    
+    // Calculate enhanced technical features
+    const { calculateEnhancedIndicators } = await import('./enhanced-indicators.ts');
+    const enhancedFeatures = calculateEnhancedIndicators(
+      historicalData, 
+      historical4hData, 
+      historical1dData,
+      currentPrice,
+      symbol,
+      sessionContext
+    );
+
+    // Try deterministic analysis first (or if requested)
     let recommendation;
-    try {
-      recommendation = await analyzeWithAI(
+    const { generateDeterministicSignal } = await import('./deterministic-engine.ts');
+    
+    if (useDeterministic || !Deno.env.get('OPEN_AI_API')) {
+      recommendation = generateDeterministicSignal(
         symbol,
-        historicalData,
-        currentData,
-        technicalAnalysis,
-        trendAnalysis,
-        marketSession,
-        romaniaTime,
-        strategy,
-        historical4hData
+        { historicalData, currentData, historical4hData },
+        enhancedFeatures,
+        sessionContext,
+        currentPrice
       );
-    } catch (aiError) {
-      console.log('AI analysis failed:', aiError.message);
       
-      // Return error instead of fallback
-      return new Response(
-        JSON.stringify({
-          error: 'AI analysis unavailable. Please try again.',
-          aiError: true,
-          success: false,
-        }),
-        {
-          status: 422, // Unprocessable Entity
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      if (!recommendation) {
+        return new Response(
+          JSON.stringify({
+            error: 'No valid trading setup detected by deterministic engine',
+            enhancedFeatures,
+            success: false,
+          }),
+          {
+            status: 422,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    } else {
+      // Fallback to AI analysis with enhanced features
+      const { analyzeWithAI } = await import('./ai-analysis.ts');
+      
+      try {
+        recommendation = await analyzeWithAI(
+          symbol,
+          historicalData,
+          currentData,
+          { ...calculateTechnicalIndicators(historicalData), enhancedFeatures },
+          analyzeTrend(historicalData),
+          getMarketSession((new Date().getUTCHours() + 2) % 24),
+          new Date(),
+          strategy,
+          historical4hData
+        );
+      } catch (aiError) {
+        console.log('AI analysis failed, using deterministic fallback:', aiError.message);
+        
+        recommendation = generateDeterministicSignal(
+          symbol,
+          { historicalData, currentData, historical4hData },
+          enhancedFeatures,
+          sessionContext,
+          currentPrice
+        );
+        
+        if (!recommendation) {
+          return new Response(
+            JSON.stringify({
+              error: 'Both AI and deterministic analysis failed to generate signals',
+              aiError: true,
+              enhancedFeatures,
+              success: false,
+            }),
+            {
+              status: 422,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
         }
-      );
+      }
     }
 
     return new Response(
       JSON.stringify({
         recommendation,
-        technicalAnalysis,
-        trendAnalysis,
-        marketSession,
+        technicalAnalysis: { 
+          ...calculateTechnicalIndicators(historicalData),
+          enhancedFeatures 
+        },
+        trendAnalysis: analyzeTrend(historicalData),
+        marketSession: getMarketSession((new Date().getUTCHours() + 2) % 24),
+        enhancedFeatures,
         strategy,
         success: true,
       }),

@@ -12,10 +12,10 @@ serve(async (req) => {
   }
 
   try {
-    const { symbol, strategy = '1H' } = await req.json();
+    const { symbol, strategy = '1H', useDeterministic = false } = await req.json();
     const twelveApiKey = Deno.env.get('TWELVE_API');
 
-    console.log(`Starting analysis for symbol: ${symbol}`);
+    console.log(`Starting enhanced analysis for symbol: ${symbol}, strategy: ${strategy}, deterministic: ${useDeterministic}`);
     console.log(`API Key exists: ${!!twelveApiKey}`);
     console.log(`Current time: ${new Date().toISOString()}`);
 
@@ -36,10 +36,25 @@ serve(async (req) => {
       `CURRENCY:${symbol}`      // "CURRENCY:EUR/USD"
     ];
     
-    // Try different symbol formats until one works
+    // Enhanced data fetching with proper window sizes and warm-up buffers
     let quoteData = null;
     let historicalData = null;
+    let historical4hData = null;
+    let historical1dData = null;
     let workingSymbol = null;
+    
+    // Determine fetch sizes based on new constraints with warm-up buffers
+    const FETCH_SIZES = {
+      '1H': 188,  // 168 + 20 warm-up
+      '4H': 90,   // 84 + 6 warm-up  
+      '1D': 27    // 22 + 5 warm-up
+    };
+    
+    const USE_SIZES = {
+      '1H': 168,  // 1 week
+      '4H': 84,   // 2 weeks
+      '1D': 22    // 1 month
+    };
     
     for (const testSymbol of symbolVariants) {
       try {
@@ -57,38 +72,51 @@ serve(async (req) => {
           console.log(`Quote API response for ${testSymbol}:`, JSON.stringify(testQuoteData, null, 2));
           
           if (testQuoteData.status !== 'error' && testQuoteData.close) {
-            // Success! Now try historical data with the same format
-            const historicalUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(testSymbol)}&interval=1h&outputsize=48&apikey=${twelveApiKey}`;
-            console.log(`Historical URL: ${historicalUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
+            // Fetch 1H data with enhanced window
+            const historical1hUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(testSymbol)}&interval=1h&outputsize=${FETCH_SIZES['1H']}&apikey=${twelveApiKey}`;
+            console.log(`1H Historical URL: ${historical1hUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
 
-            const historicalResponse = await fetch(historicalUrl);
+            const historical1hResponse = await fetch(historical1hUrl);
             
-            if (historicalResponse.ok) {
-              const testHistoricalData = await historicalResponse.json();
-              console.log(`Historical API response for ${testSymbol}:`, JSON.stringify(testHistoricalData, null, 2));
+            if (historical1hResponse.ok) {
+              const test1hData = await historical1hResponse.json();
+              console.log(`1H Historical API response for ${testSymbol}: ${test1hData.values?.length || 0} candles`);
               
-              if (testHistoricalData.status !== 'error' && testHistoricalData.values) {
-                let historical4hData = null;
+              if (test1hData.status !== 'error' && test1hData.values) {
+                let test4hData = null;
+                let test1dData = null;
                 
-                // If strategy includes 4H data, fetch it
-                if (strategy === '1H+4H') {
-                  const historical4hUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(testSymbol)}&interval=4h&outputsize=12&apikey=${twelveApiKey}`;
-                  console.log(`4H Historical URL: ${historical4hUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
-                  
-                  const historical4hResponse = await fetch(historical4hUrl);
-                  if (historical4hResponse.ok) {
-                    const test4hData = await historical4hResponse.json();
-                    if (test4hData.status !== 'error' && test4hData.values) {
-                      historical4hData = test4hData;
-                      console.log(`Successfully fetched 4H data for ${testSymbol}`);
-                    }
+                // Always fetch 4H and 1D data for enhanced analysis
+                const historical4hUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(testSymbol)}&interval=4h&outputsize=${FETCH_SIZES['4H']}&apikey=${twelveApiKey}`;
+                console.log(`4H Historical URL: ${historical4hUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
+                
+                const historical4hResponse = await fetch(historical4hUrl);
+                if (historical4hResponse.ok) {
+                  const temp4hData = await historical4hResponse.json();
+                  if (temp4hData.status !== 'error' && temp4hData.values) {
+                    test4hData = temp4hData;
+                    console.log(`Successfully fetched 4H data for ${testSymbol}: ${temp4hData.values.length} candles`);
                   }
                 }
                 
-                // Both calls successful!
+                // Fetch 1D data for daily context
+                const historical1dUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(testSymbol)}&interval=1day&outputsize=${FETCH_SIZES['1D']}&apikey=${twelveApiKey}`;
+                console.log(`1D Historical URL: ${historical1dUrl.replace(twelveApiKey, 'HIDDEN_KEY')}`);
+                
+                const historical1dResponse = await fetch(historical1dUrl);
+                if (historical1dResponse.ok) {
+                  const temp1dData = await historical1dResponse.json();
+                  if (temp1dData.status !== 'error' && temp1dData.values) {
+                    test1dData = temp1dData;
+                    console.log(`Successfully fetched 1D data for ${testSymbol}: ${temp1dData.values.length} candles`);
+                  }
+                }
+                
+                // All calls successful!
                 quoteData = testQuoteData;
-                historicalData = testHistoricalData;
-                historicalData.historical4h = historical4hData; // Add 4H data to the main object
+                historicalData = test1hData;
+                historical4hData = test4hData;
+                historical1dData = test1dData;
                 workingSymbol = testSymbol;
                 console.log(`Successfully found data for symbol format: ${testSymbol}`);
                 break;
@@ -105,6 +133,48 @@ serve(async (req) => {
     if (!quoteData || !historicalData) {
       throw new Error(`Unable to fetch data for ${symbol}. Tried formats: ${symbolVariants.join(', ')}`);
     }
+    
+    // Enhanced session and timezone calculations
+    const calculateSessionContext = () => {
+      const currentTime = new Date();
+      const romaniaTime = new Date(currentTime.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
+      const nyTime = new Date(currentTime.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const utcTime = new Date(currentTime.toLocaleString('en-US', { timeZone: 'UTC' }));
+      
+      // Calculate EOD as 17:00 America/New_York
+      const nyEodHour = 17;
+      const currentNyHour = nyTime.getHours();
+      const currentNyMinute = nyTime.getMinutes();
+      const minutesUntilEod = currentNyHour < nyEodHour 
+        ? (nyEodHour - currentNyHour) * 60 - currentNyMinute
+        : (24 - currentNyHour + nyEodHour) * 60 - currentNyMinute;
+      
+      // Determine current session
+      const utcHour = utcTime.getHours();
+      let currentSession = 'Closed';
+      if (utcHour >= 0 && utcHour < 9) currentSession = 'Tokyo';
+      else if (utcHour >= 8 && utcHour < 17) currentSession = 'London';  
+      else if (utcHour >= 13 && utcHour < 22) currentSession = 'NewYork';
+      if (utcHour >= 13 && utcHour < 17) currentSession = 'Overlap'; // London-NY overlap
+      
+      // Weekend check
+      const romaniaDay = romaniaTime.getDay();
+      const romaniaHour = romaniaTime.getHours();
+      const isWeekendOrHoliday = 
+        romaniaDay === 0 || // Sunday
+        romaniaDay === 6 || // Saturday  
+        (romaniaDay === 5 && romaniaHour >= 19) || // Friday after 19:00
+        (romaniaDay === 1 && romaniaHour < 10); // Monday before 10:00
+      
+      return {
+        minutesToEOD: Math.max(0, minutesUntilEod),
+        session: currentSession,
+        isWeekendOrHoliday,
+        romaniaTime: romaniaTime.toISOString(),
+        nyTime: nyTime.toISOString(),
+        utcTime: utcTime.toISOString()
+      };
+    };
 
     // Calculate tick volume and alternative volume metrics
     const calculateForexVolume = (candles: any[]) => {
@@ -196,8 +266,11 @@ serve(async (req) => {
       sessionMultiplier: currentSessionMultiplier
     };
 
-    // Process historical data for analysis
+    // Enhanced processing with proper filtering and truncation
+    const sessionContext = calculateSessionContext();
     const currentTime = new Date();
+    
+    // Process 1H data with enhanced filtering
     const processedHistoricalData = historicalData.values?.map((candle: any, index: number) => {
       const candleTime = new Date(candle.datetime);
       const timeDiff = candleTime.getTime() - currentTime.getTime();
@@ -217,34 +290,25 @@ serve(async (req) => {
         volume: 0, // Will be calculated below
       };
     }).reverse() || []; // Reverse to get chronological order
-
-    // Calculate synthetic volume for historical data
-    const historicalWithVolume = calculateForexVolume(processedHistoricalData);
-
-    // Filter out future timestamps (more than 1 hour in future)
-    const validHistoricalData = historicalWithVolume.filter((candle: any) => {
+    
+    // Drop current in-progress bar if needed
+    const filteredHistoricalData = processedHistoricalData.filter((candle: any) => {
       const candleTime = new Date(candle.datetime);
       const timeDiff = candleTime.getTime() - currentTime.getTime();
       const hoursDiff = timeDiff / (1000 * 60 * 60);
       return hoursDiff <= 1; // Allow up to 1 hour in future for timezone tolerance
     });
+    
+    // Truncate to use sizes (keeping most recent data)
+    const truncatedHistoricalData = filteredHistoricalData.slice(-USE_SIZES['1H']);
 
-    console.log(`Processed ${processedHistoricalData.length} historical data points`);
-    console.log(`Filtered to ${validHistoricalData.length} valid data points (removing future timestamps)`);
-    console.log(`First candle: ${validHistoricalData[0]?.datetime || 'None'}`);
-    console.log(`Last candle: ${validHistoricalData[validHistoricalData.length - 1]?.datetime || 'None'}`);
-    console.log(`Current data:`, JSON.stringify(currentData, null, 2));
-    console.log(`Sample volume metrics:`, validHistoricalData.slice(-3).map(c => ({
-      time: c.datetime,
-      volume: c.volume,
-      tickVolume: c.tickVolume,
-      sessionMultiplier: c.sessionMultiplier
-    })));
-
+    // Calculate synthetic volume for truncated historical data
+    const historicalWithVolume = calculateForexVolume(truncatedHistoricalData);
+    
     // Process 4H data if available
     let historical4hProcessed = null;
-    if (historicalData.historical4h?.values) {
-      const processed4hData = historicalData.historical4h.values.map((candle: any) => ({
+    if (historical4hData?.values) {
+      const processed4hData = historical4hData.values.map((candle: any) => ({
         datetime: candle.datetime,
         open: parseFloat(candle.open),
         high: parseFloat(candle.high),
@@ -253,22 +317,64 @@ serve(async (req) => {
         volume: 0, // Will be calculated below
       })).reverse();
       
-      historical4hProcessed = calculateForexVolume(processed4hData);
-      console.log(`Processed ${historical4hProcessed.length} 4H candles`);
+      // Truncate 4H data to use size
+      const truncated4hData = processed4hData.slice(-USE_SIZES['4H']);
+      historical4hProcessed = calculateForexVolume(truncated4hData);
+      console.log(`Processed ${historical4hProcessed.length} 4H candles (truncated from ${processed4hData.length})`);
     }
+    
+    // Process 1D data if available  
+    let historical1dProcessed = null;
+    if (historical1dData?.values) {
+      const processed1dData = historical1dData.values.map((candle: any) => ({
+        datetime: candle.datetime,
+        open: parseFloat(candle.open),
+        high: parseFloat(candle.high),
+        low: parseFloat(candle.low),
+        close: parseFloat(candle.close),
+        volume: 0, // Will be calculated below
+      })).reverse();
+      
+      // Truncate 1D data to use size
+      const truncated1dData = processed1dData.slice(-USE_SIZES['1D']);
+      historical1dProcessed = calculateForexVolume(truncated1dData);
+      console.log(`Processed ${historical1dProcessed.length} 1D candles (truncated from ${processed1dData.length})`);
+    }
+
+    console.log(`Enhanced processing complete:`);
+    console.log(`- 1H: ${historicalWithVolume.length} candles (from ${processedHistoricalData.length} fetched)`);
+    console.log(`- 4H: ${historical4hProcessed?.length || 0} candles`);
+    console.log(`- 1D: ${historical1dProcessed?.length || 0} candles`);
+    console.log(`- Session: ${sessionContext.session}, EOD in ${sessionContext.minutesToEOD} minutes`);
+    console.log(`- Weekend/Holiday: ${sessionContext.isWeekendOrHoliday}`);
+    console.log(`First 1H candle: ${historicalWithVolume[0]?.datetime || 'None'}`);
+    console.log(`Last 1H candle: ${historicalWithVolume[historicalWithVolume.length - 1]?.datetime || 'None'}`);
+    console.log(`Current data:`, JSON.stringify(currentData, null, 2));
+    console.log(`Sample volume metrics:`, historicalWithVolume.slice(-3).map(c => ({
+      time: c.datetime,
+      volume: c.volume,
+      tickVolume: c.tickVolume,
+      sessionMultiplier: c.sessionMultiplier
+    })));
 
     return new Response(
       JSON.stringify({
         currentData,
-        historicalData: validHistoricalData,
+        historicalData: historicalWithVolume,
         historical4hData: historical4hProcessed,
+        historical1dData: historical1dProcessed,
+        sessionContext,
         strategy,
         success: true,
         metadata: {
-          totalCandles: processedHistoricalData.length,
-          validCandles: validHistoricalData.length,
-          filteredCandles: processedHistoricalData.length - validHistoricalData.length,
-          has4hData: !!historical4hProcessed
+          fetchSizes: FETCH_SIZES,
+          useSizes: USE_SIZES,
+          totalFetched1H: processedHistoricalData.length,
+          usedCandles1H: historicalWithVolume.length,
+          usedCandles4H: historical4hProcessed?.length || 0,
+          usedCandles1D: historical1dProcessed?.length || 0,
+          filteredCandles: processedHistoricalData.length - filteredHistoricalData.length,
+          sessionInfo: sessionContext
         }
       }),
       {

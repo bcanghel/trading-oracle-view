@@ -1,0 +1,339 @@
+// Deterministic Signal Engine - No-LLM Fallback/Primary Analysis Engine
+
+import { EnhancedFeatures } from './enhanced-indicators.ts';
+
+export interface DeterministicAnalysis {
+  action: 'BUY' | 'SELL';
+  confidence: number; // 20-90
+  entry: number;
+  stopLoss: number;
+  takeProfit: number;
+  support: number;
+  resistance: number;
+  reasoning: string[];
+  riskReward: number;
+  entryConditions?: string;
+  entryTiming?: string;
+  volumeConfirmation?: string;
+  candlestickSignals?: string;
+  algorithmicStrategy: string;
+  algorithmicPositionSize: number;
+}
+
+export function generateDeterministicSignal(
+  symbol: string,
+  currentData: any,
+  features: EnhancedFeatures,
+  sessionContext: any,
+  currentPrice: number
+): DeterministicAnalysis | null {
+  
+  // === HARD PRE-GATES ===
+  const reasoning: string[] = [];
+  
+  // Weekend/Holiday gate
+  if (sessionContext.isWeekendOrHoliday) {
+    reasoning.push("Market closed: Weekend/Holiday period");
+    return null;
+  }
+  
+  // EOD gate (120 minutes before close)
+  if (sessionContext.minutesToEOD < 120) {
+    reasoning.push(`Too close to EOD: ${sessionContext.minutesToEOD} minutes remaining`);
+    return null;
+  }
+  
+  // Spread/Activity gates
+  if (features.spreadZ > 2.0) {
+    reasoning.push(`High spread: Z-score ${features.spreadZ.toFixed(2)}`);
+    return null;
+  }
+  
+  if (features.activityScore < -1.0) {
+    reasoning.push(`Low activity: Score ${features.activityScore.toFixed(2)}`);
+    return null;
+  }
+  
+  // === STRATEGY SELECTION ===
+  let strategy: 'BREAKOUT' | 'TREND' | 'MEANREV' | null = null;
+  let setupReasoning: string[] = [];
+  
+  // BREAKOUT Setup
+  if (features.squeeze && 
+      Math.abs(currentPrice - (features.or60.high + features.or60.low) / 2) <= 0.2 * features.atr20 &&
+      features.confluenceScore >= 60) {
+    strategy = 'BREAKOUT';
+    setupReasoning.push("Squeeze detected with OR60 proximity");
+    setupReasoning.push(`Confluence score: ${features.confluenceScore}`);
+  }
+  
+  // TREND Setup (if no breakout)
+  else if (features.confluenceScore >= 55) {
+    const bullishTrend = currentPrice > features.ema100 && features.ema20Slope > 0 && features.bias4h > 0;
+    const bearishTrend = currentPrice < features.ema100 && features.ema20Slope < 0 && features.bias4h < 0;
+    
+    if (bullishTrend || bearishTrend) {
+      strategy = 'TREND';
+      setupReasoning.push(bullishTrend ? "Bullish trend alignment" : "Bearish trend alignment");
+      setupReasoning.push(`Price vs EMA100: ${features.distToEMA100.toFixed(1)} bps`);
+      setupReasoning.push(`4H bias: ${features.bias4h.toFixed(2)}`);
+    }
+  }
+  
+  // MEANREV Setup (if no trend or breakout)
+  else if (features.confluenceScore >= 50 &&
+           features.distanceToSRZone <= 0.15 * features.atr14 &&
+           features.adrUsedToday <= 85) {
+    
+    // RSI extreme conditions for mean reversion
+    const rsi = calculateSimpleRSI(currentData.historicalData || [], 14);
+    if (rsi < 30 || rsi > 70) {
+      strategy = 'MEANREV';
+      setupReasoning.push(`RSI extreme: ${rsi.toFixed(1)}`);
+      setupReasoning.push(`Near SR zone: ${features.distanceToSRZone.toFixed(5)}`);
+      setupReasoning.push(`ADR used: ${features.adrUsedToday.toFixed(1)}%`);
+    }
+  }
+  
+  // No valid setup
+  if (!strategy) {
+    reasoning.push("No valid setup detected");
+    reasoning.push(`Confluence: ${features.confluenceScore}, Squeeze: ${features.squeeze}`);
+    reasoning.push(`ADR used: ${features.adrUsedToday.toFixed(1)}%`);
+    return null;
+  }
+  
+  // === DIRECTION AND LEVELS ===
+  const direction = determineDirection(strategy, features, currentPrice);
+  if (!direction) {
+    reasoning.push("Could not determine valid direction");
+    return null;
+  }
+  
+  const { action, entry, stopLoss, takeProfit, support, resistance } = 
+    calculateLevels(strategy, direction, currentPrice, features, symbol);
+  
+  // === RISK/REWARD VALIDATION ===
+  const riskReward = Math.abs(takeProfit - entry) / Math.abs(entry - stopLoss);
+  if (riskReward < 1.8) {
+    reasoning.push(`Insufficient R/R: ${riskReward.toFixed(2)}, required: 1.8+`);
+    return null;
+  }
+  
+  // === CONFIDENCE CALCULATION ===
+  let confidence = 50; // Base
+  confidence += Math.floor(features.confluenceScore / 2); // +0 to +50
+  
+  // Strategy bonuses
+  if (strategy === 'BREAKOUT' && features.squeeze) confidence += 10;
+  if (strategy === 'TREND' && Math.abs(features.bias4h) > 0.5) confidence += 5;
+  
+  // Session bonus
+  if (sessionContext.session === 'Overlap' || sessionContext.session === 'London') {
+    confidence += 5;
+  }
+  
+  // ADR penalty
+  if (features.adrUsedToday > 80) confidence -= 10;
+  if (features.adrUsedToday > 90) confidence -= 20;
+  
+  // Clamp to valid range
+  confidence = Math.max(20, Math.min(90, confidence));
+  
+  // === POSITION SIZING ===
+  const positionSize = calculateATRPositionSize(symbol, entry, stopLoss, features.atr14);
+  
+  // === BUILD REASONING ===
+  reasoning.push(`Strategy: ${strategy}`);
+  reasoning.push(...setupReasoning);
+  reasoning.push(`Entry: ${entry.toFixed(5)}, SL: ${stopLoss.toFixed(5)}, TP: ${takeProfit.toFixed(5)}`);
+  reasoning.push(`R/R: ${riskReward.toFixed(2)}, Confidence: ${confidence}%`);
+  reasoning.push(`Session: ${sessionContext.session}, EOD: ${sessionContext.minutesToEOD}min`);
+  reasoning.push(`Position size: ${positionSize} units`);
+  
+  return {
+    action,
+    confidence,
+    entry,
+    stopLoss,
+    takeProfit,
+    support,
+    resistance,
+    reasoning,
+    riskReward,
+    entryConditions: generateEntryConditions(strategy, features),
+    entryTiming: generateEntryTiming(strategy, sessionContext),
+    volumeConfirmation: generateVolumeConfirmation(features),
+    candlestickSignals: generateCandlestickSignals(strategy, features),
+    algorithmicStrategy: strategy,
+    algorithmicPositionSize: positionSize
+  };
+}
+
+function determineDirection(
+  strategy: 'BREAKOUT' | 'TREND' | 'MEANREV',
+  features: EnhancedFeatures,
+  currentPrice: number
+): 'LONG' | 'SHORT' | null {
+  
+  switch (strategy) {
+    case 'BREAKOUT':
+      // Direction based on OR60 break and squeeze expansion
+      if (currentPrice > features.or60.high && features.ema20Slope > 0) return 'LONG';
+      if (currentPrice < features.or60.low && features.ema20Slope < 0) return 'SHORT';
+      // Anticipate break direction
+      if (features.distanceToVWAP > 0 && features.ema20 > features.ema50) return 'LONG';
+      if (features.distanceToVWAP < 0 && features.ema20 < features.ema50) return 'SHORT';
+      break;
+      
+    case 'TREND':
+      // Follow the established trend
+      if (currentPrice > features.ema100 && features.ema20Slope > 0 && features.bias4h > 0) {
+        return 'LONG';
+      }
+      if (currentPrice < features.ema100 && features.ema20Slope < 0 && features.bias4h < 0) {
+        return 'SHORT';
+      }
+      break;
+      
+    case 'MEANREV':
+      // Counter-trend at extremes
+      const rsi = 50; // Simplified - would use actual RSI
+      if (rsi > 70 && features.inSRZone) return 'SHORT';
+      if (rsi < 30 && features.inSRZone) return 'LONG';
+      break;
+  }
+  
+  return null;
+}
+
+function calculateLevels(
+  strategy: 'BREAKOUT' | 'TREND' | 'MEANREV',
+  direction: 'LONG' | 'SHORT',
+  currentPrice: number,
+  features: EnhancedFeatures,
+  symbol: string
+) {
+  const isLong = direction === 'LONG';
+  const action = isLong ? 'BUY' : 'SELL';
+  
+  // ATR-based stops and targets
+  let slMultiplier = 0.8; // Default
+  let tpMultiplier = 1.6; // Default 2:1 R/R
+  
+  // Strategy-specific adjustments
+  switch (strategy) {
+    case 'MEANREV':
+      slMultiplier = 0.6;
+      tpMultiplier = 1.2;
+      break;
+    case 'TREND':
+    case 'BREAKOUT':
+      slMultiplier = 0.8;
+      tpMultiplier = 1.6;
+      break;
+  }
+  
+  const atr = features.atr14 || 0.0001;
+  const stopDistance = atr * slMultiplier;
+  const targetDistance = atr * tpMultiplier;
+  
+  const entry = currentPrice; // Market order for simplicity
+  const stopLoss = isLong ? entry - stopDistance : entry + stopDistance;
+  const takeProfit = isLong ? entry + targetDistance : entry - targetDistance;
+  
+  // Support/Resistance from nearest zones
+  let support = currentPrice;
+  let resistance = currentPrice;
+  
+  const supportZones = features.srZones.filter(z => z.type === 'support' && z.max < currentPrice);
+  const resistanceZones = features.srZones.filter(z => z.type === 'resistance' && z.min > currentPrice);
+  
+  if (supportZones.length > 0) {
+    support = supportZones.reduce((nearest, zone) => 
+      Math.abs(zone.max - currentPrice) < Math.abs(nearest - currentPrice) ? zone.max : nearest, 
+      supportZones[0].max
+    );
+  }
+  
+  if (resistanceZones.length > 0) {
+    resistance = resistanceZones.reduce((nearest, zone) => 
+      Math.abs(zone.min - currentPrice) < Math.abs(nearest - currentPrice) ? zone.min : nearest,
+      resistanceZones[0].min
+    );
+  }
+  
+  return { action, entry, stopLoss, takeProfit, support, resistance };
+}
+
+function calculateATRPositionSize(symbol: string, entryPrice: number, stopLoss: number, atr: number): number {
+  const accountEquity = 10000; // Default account size
+  const riskPercentage = 0.01; // 1% risk
+  
+  const riskAmount = accountEquity * riskPercentage;
+  const stopDistance = Math.abs(entryPrice - stopLoss);
+  const pipMultiplier = symbol.includes('JPY') ? 100 : 10000;
+  const pipValue = symbol.includes('JPY') ? 9.09 : 10; // Simplified
+  
+  const riskPips = stopDistance * pipMultiplier;
+  const positionUnits = riskPips > 0 ? Math.floor(riskAmount / (riskPips * pipValue)) : 0;
+  
+  return Math.max(0, positionUnits);
+}
+
+function generateEntryConditions(strategy: string, features: EnhancedFeatures): string {
+  switch (strategy) {
+    case 'BREAKOUT':
+      return `Wait for squeeze expansion with volume confirmation. Entry on close beyond OR60 ${features.or60.state}`;
+    case 'TREND':
+      return `Enter on pullback to EMA20 (${features.ema20.toFixed(5)}) with bullish/bearish close`;
+    case 'MEANREV':
+      return `Enter at SR zone with RSI divergence confirmation`;
+    default:
+      return 'Market order execution';
+  }
+}
+
+function generateEntryTiming(strategy: string, sessionContext: any): string {
+  const session = sessionContext.session;
+  const eodMin = sessionContext.minutesToEOD;
+  
+  if (session === 'Overlap') return 'Optimal timing - London-NY overlap period';
+  if (session === 'London') return 'Good timing - London session active';
+  if (eodMin < 180) return `Caution - Only ${eodMin} minutes until EOD`;
+  
+  return 'Standard market hours';
+}
+
+function generateVolumeConfirmation(features: EnhancedFeatures): string {
+  if (features.activityScore > 1) return 'High activity - strong volume confirmation';
+  if (features.activityScore > 0) return 'Moderate activity - adequate volume';
+  return 'Low activity - monitor for volume pickup';
+}
+
+function generateCandlestickSignals(strategy: string, features: EnhancedFeatures): string {
+  const bodyRatio = features.candleBodyRatio;
+  
+  if (bodyRatio > 0.7) return 'Strong directional candle - good momentum signal';
+  if (bodyRatio > 0.5) return 'Moderate body size - decent directional bias';
+  return 'Small body - indecision or consolidation';
+}
+
+function calculateSimpleRSI(data: any[], period: number): number {
+  if (!data || data.length < period + 1) return 50;
+  
+  const closes = data.slice(-period - 1).map(d => parseFloat(d.close));
+  let gains = 0, losses = 0;
+  
+  for (let i = 1; i < closes.length; i++) {
+    const change = closes[i] - closes[i - 1];
+    if (change > 0) gains += change;
+    else losses -= change;
+  }
+  
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  
+  return 100 - (100 / (1 + rs));
+}
