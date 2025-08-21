@@ -73,47 +73,51 @@ serve(async (req) => {
     };
 
     const fetchMarketData = async (symbol: string) => {
-      // Get exactly 48x 1H candles + 12x 4H candles (same as Market Analysis tab)
-      const response1h = await fetch(
-        `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1h&apikey=${twelveApiKey}&outputsize=48`
-      );
-      const data1h = await response1h.json();
-      
-      const response4h = await fetch(
-        `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=4h&apikey=${twelveApiKey}&outputsize=12`
-      );
-      const data4h = await response4h.json();
-      
-      if (!data1h.values || data1h.values.length === 0) {
-        throw new Error(`No 1H market data for ${symbol}`);
+      // Use enhanced fetch-market-data function with proper window sizes and session context
+      const response = await fetch('https://cgmzxonyaiwtcyxmmhsi.supabase.co/functions/v1/fetch-market-data', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symbol,
+          strategy: '1H+4H', // Multi-timeframe strategy
+          useDeterministic: false // Allow AI analysis first
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch enhanced market data for ${symbol}: ${await response.text()}`);
       }
 
-      const latest = data1h.values[0];
-      const previousPrice = data1h.values[1] ? parseFloat(data1h.values[1].close) : parseFloat(latest.close);
-      const currentPrice = parseFloat(latest.close);
-      const change = currentPrice - previousPrice;
-      const changePercent = (change / previousPrice) * 100;
+      const data = await response.json();
       
+      if (!data.success) {
+        throw new Error(`Enhanced market data failed for ${symbol}: ${data.error}`);
+      }
+
+      console.log(`Enhanced market data for ${symbol}:`, {
+        candles1h: data.historicalData?.length || 0,
+        candles4h: data.historical4hData?.length || 0,
+        candles1d: data.historical1dData?.length || 0,
+        session: data.sessionContext?.session,
+        eodMinutes: data.sessionContext?.minutesToEOD,
+        isWeekend: data.sessionContext?.isWeekendOrHoliday
+      });
+
       return {
-        historicalData: data1h.values.slice(0, 48), // Exactly 48 candles
-        historical4hData: data4h.values ? data4h.values.slice(0, 12) : [], // Exactly 12 candles
-        currentData: {
-          symbol: symbol,
-          currentPrice: currentPrice,
-          change: change,
-          changePercent: changePercent,
-          high24h: Math.max(...data1h.values.slice(0, 24).map(d => parseFloat(d.high))),
-          low24h: Math.min(...data1h.values.slice(0, 24).map(d => parseFloat(d.low))),
-          volume: parseInt(latest.volume) || 2705,
-          volumeType: "synthetic",
-          sessionMultiplier: 0.8
-        },
-        strategy: '1H+4H' // Multi-timeframe strategy
+        historicalData: data.historicalData,
+        historical4hData: data.historical4hData || [],
+        historical1dData: data.historical1dData || [], // New 1D data
+        currentData: data.currentData,
+        sessionContext: data.sessionContext, // New session context
+        strategy: data.strategy
       };
     };
 
-    const getAIAnalysis = async (symbol: string, historicalData: any[], currentData: any, historical4hData: any[]) => {
-      // Use the same advanced analysis as the Market Analysis tab with multi-timeframe data
+    const getAIAnalysis = async (symbol: string, historicalData: any[], currentData: any, historical4hData: any[], historical1dData: any[] = [], sessionContext: any = {}) => {
+      // Use enhanced analysis with deterministic fallback
       const analysisResponse = await fetch('https://cgmzxonyaiwtcyxmmhsi.supabase.co/functions/v1/analyze-trading-opportunity', {
         method: 'POST',
         headers: {
@@ -123,36 +127,102 @@ serve(async (req) => {
         body: JSON.stringify({
           symbol,
           historicalData,
-          currentData, // Send complete currentData object with all fields
-          historical4hData, // Include 4H data for comprehensive analysis
-          strategy: '1H+4H' // Multi-timeframe strategy like Market Analysis tab
+          currentData, // Enhanced current data with session context
+          historical4hData, // 4H data for multi-timeframe analysis
+          historical1dData, // New 1D data for daily context
+          strategy: '1H+4H',
+          useDeterministic: false // Try AI first, fallback to deterministic
         }),
       });
 
       if (!analysisResponse.ok) {
-        console.error('Failed to get trading analysis:', await analysisResponse.text());
-        return { error: 'API request failed', response: null };
+        console.error('Failed to get enhanced trading analysis:', await analysisResponse.text());
+        
+        // Try deterministic mode as fallback
+        console.log('Attempting deterministic analysis fallback...');
+        const deterministicResponse = await fetch('https://cgmzxonyaiwtcyxmmhsi.supabase.co/functions/v1/analyze-trading-opportunity', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            symbol,
+            historicalData,
+            currentData,
+            historical4hData,
+            historical1dData,
+            strategy: '1H+4H',
+            useDeterministic: true // Force deterministic mode
+          }),
+        });
+        
+        if (!deterministicResponse.ok) {
+          return { error: 'Both AI and deterministic analysis failed', response: null };
+        }
+        
+        const deterministicData = await deterministicResponse.json();
+        if (!deterministicData.success) {
+          return { error: 'Deterministic analysis failed', response: null };
+        }
+        
+        console.log('✅ Using deterministic analysis as fallback');
+        const recommendation = deterministicData.recommendation;
+        
+        console.log(`Deterministic Analysis for ${symbol}:`, {
+          confidence: recommendation?.confidence || 'N/A',
+          action: recommendation?.action || 'N/A',
+          entry: recommendation?.entry || 'N/A',
+          stopLoss: recommendation?.stopLoss || 'N/A',
+          takeProfit: recommendation?.takeProfit || 'N/A',
+          strategy: recommendation?.algorithmicStrategy || 'N/A'
+        });
+        
+        if (!recommendation) {
+          return { error: 'No deterministic recommendation returned', response: null };
+        }
+        
+        // Continue with existing risk management logic...
+        const pipMultiplier = symbol.includes('JPY') ? 100 : 10000;
+        const riskPips = Math.abs(recommendation.entry - recommendation.stopLoss) * pipMultiplier;
+        const rewardPips = Math.abs(recommendation.takeProfit - recommendation.entry) * pipMultiplier;
+        const rrRatio = rewardPips / riskPips;
+        
+        // Use deterministic values with existing validation
+        return {
+          action: recommendation.action,
+          entry: recommendation.entry,
+          stopLoss: recommendation.stopLoss,
+          takeProfit: recommendation.takeProfit,
+          confidence: recommendation.confidence,
+          reasoning: recommendation.reasoning?.join(' ') || 'Deterministic analysis',
+          rrRatio: rrRatio,
+          riskPips: riskPips,
+          rewardPips: rewardPips,
+          error: null
+        };
       }
 
       const analysisData = await analysisResponse.json();
       
       if (!analysisData.success) {
-        console.error('Trading analysis failed:', analysisData.error);
-        return { error: 'Analysis failed', response: null };
+        console.error('Enhanced trading analysis failed:', analysisData.error);
+        return { error: 'Enhanced analysis failed', response: null };
       }
 
       const recommendation = analysisData.recommendation;
-      console.log(`AI Analysis for ${symbol}:`, {
+      console.log(`Enhanced AI Analysis for ${symbol}:`, {
         confidence: recommendation?.confidence || 'N/A',
         action: recommendation?.action || 'N/A',
         entry: recommendation?.entry || 'N/A',
         stopLoss: recommendation?.stopLoss || 'N/A',
         takeProfit: recommendation?.takeProfit || 'N/A',
-        reasoning: recommendation?.reasoning || 'N/A'
+        reasoning: recommendation?.reasoning || 'N/A',
+        enhancedFeatures: analysisData.enhancedFeatures ? 'Available' : 'N/A'
       });
 
       if (!recommendation) {
-        return { error: 'No recommendation returned', response: null };
+        return { error: 'No enhanced recommendation returned', response: null };
       }
 
       // Calculate pip-based risk management (50 pips max SL, 100 pips max TP, 2:1 R/R)
@@ -390,10 +460,32 @@ serve(async (req) => {
           price: marketData.currentData.currentPrice,
           strategy: marketData.strategy,
           has1hData: marketData.historicalData?.length || 0,
-          has4hData: marketData.historical4hData?.length || 0
+          has4hData: marketData.historical4hData?.length || 0,
+          has1dData: marketData.historical1dData?.length || 0,
+          session: marketData.sessionContext?.session,
+          eodMinutes: marketData.sessionContext?.minutesToEOD,
+          isWeekend: marketData.sessionContext?.isWeekendOrHoliday
         });
         
-        const analysis = await getAIAnalysis(symbol, marketData.historicalData, marketData.currentData, marketData.historical4hData);
+        // Check session context gates before analysis
+        if (marketData.sessionContext?.isWeekendOrHoliday) {
+          console.log(`❌ ${symbol}: Weekend/Holiday period - skipping trade generation`);
+          return null;
+        }
+        
+        if (marketData.sessionContext?.minutesToEOD < 120) {
+          console.log(`❌ ${symbol}: Too close to EOD (${marketData.sessionContext.minutesToEOD} minutes) - skipping trade generation`);
+          return null;
+        }
+        
+        const analysis = await getAIAnalysis(
+          symbol, 
+          marketData.historicalData, 
+          marketData.currentData, 
+          marketData.historical4hData,
+          marketData.historical1dData, // Pass 1D data
+          marketData.sessionContext // Pass session context
+        );
         console.log(`Got analysis for ${symbol}:`, analysis ? {
           action: analysis.action,
           confidence: analysis.confidence,
