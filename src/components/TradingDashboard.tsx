@@ -597,58 +597,61 @@ export function TradingDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-2 sm:p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Trading Oracle</h1>
-            <p className="text-muted-foreground">AI-Powered Forex Trading Analysis</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-center sm:text-left">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Trading Oracle</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">AI-Powered Forex Trading Analysis</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-end gap-2 sm:gap-4">
             <div className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium">Live Market Data</span>
+              <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              <span className="text-xs sm:text-sm font-medium">Live Market Data</span>
             </div>
             <UserMenu />
           </div>
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="analysis" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="analysis" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Market Analysis
+        <Tabs defaultValue="analysis" className="space-y-4 sm:space-y-6">
+          <TabsList className="grid w-full grid-cols-3 h-12 sm:h-10">
+            <TabsTrigger value="analysis" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+              <BarChart3 className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden xs:inline sm:inline">Market Analysis</span>
+              <span className="xs:hidden sm:hidden">Analysis</span>
             </TabsTrigger>
-            <TabsTrigger value="auto-trading" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Auto Trading
+            <TabsTrigger value="auto-trading" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+              <Activity className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden xs:inline sm:inline">Auto Trading</span>
+              <span className="xs:hidden sm:hidden">Auto</span>
             </TabsTrigger>
-            <TabsTrigger value="sessions" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Market Sessions
+            <TabsTrigger value="sessions" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden xs:inline sm:inline">Market Sessions</span>
+              <span className="xs:hidden sm:hidden">Sessions</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="analysis" className="space-y-6">
+          <TabsContent value="analysis" className="space-y-4 sm:space-y-6">
             {/* Trading Controls */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
                   Market Analysis
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-4 items-end">
-                  <div className="flex-1 max-w-xs">
-                    <label className="text-sm font-medium mb-2 block">Currency Pair</label>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:items-end">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium block">Currency Pair</label>
                     <Select value={selectedPair} onValueChange={setSelectedPair}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-10">
                         <SelectValue placeholder="Select a pair" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-50">
                         {FOREX_PAIRS.map((pair) => (
                           <SelectItem key={pair.value} value={pair.value}>
                             {pair.label}
@@ -657,13 +660,13 @@ export function TradingDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex-1 max-w-xs">
-                    <label className="text-sm font-medium mb-2 block">Analysis Strategy</label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium block">Analysis Strategy</label>
                     <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-10">
                         <SelectValue placeholder="Select strategy" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-50">
                         <SelectItem value="1H">
                           <div className="flex flex-col">
                             <span>1H Strategy</span>
@@ -679,21 +682,38 @@ export function TradingDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button 
-                    onClick={analyzeMarket} 
-                    disabled={!selectedPair || isAnalyzing}
-                    className="min-w-[140px]"
-                  >
-                    {isAnalyzing ? "Analyzing..." : "Analyze Market"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowSavedAnalyses(!showSavedAnalyses)}
-                    className="min-w-[140px]"
-                  >
-                    <History className="h-4 w-4 mr-2" />
-                    {showSavedAnalyses ? "Hide" : "Show"} History
-                  </Button>
+                  <div className="col-span-1 sm:col-span-2 lg:col-span-1 space-y-2 lg:space-y-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
+                      <Button 
+                        onClick={analyzeMarket} 
+                        disabled={!selectedPair || isAnalyzing}
+                        className="w-full h-10"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            <span className="hidden sm:inline">Analyzing...</span>
+                            <span className="sm:hidden">Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <BarChart3 className="mr-2 h-4 w-4" />
+                            <span className="hidden sm:inline">Analyze Market</span>
+                            <span className="sm:hidden">Analyze</span>
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowSavedAnalyses(!showSavedAnalyses)}
+                        className="w-full h-10"
+                      >
+                        <History className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">{showSavedAnalyses ? "Hide" : "Show"} History</span>
+                        <span className="sm:hidden">History</span>
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -701,17 +721,17 @@ export function TradingDashboard() {
         {/* Saved Analyses */}
         {showSavedAnalyses && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <History className="h-4 w-4 sm:h-5 sm:w-5" />
                 Saved Analyses
               </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoadingSaved ? (
-                <p className="text-muted-foreground">Loading saved analyses...</p>
+                <p className="text-muted-foreground text-center py-4">Loading saved analyses...</p>
               ) : savedAnalyses.length === 0 ? (
-                <p className="text-muted-foreground">No saved analyses found</p>
+                <p className="text-muted-foreground text-center py-4">No saved analyses found</p>
               ) : (
                 <div className="space-y-3">
                    {savedAnalyses.map((analysis) => {
@@ -719,134 +739,146 @@ export function TradingDashboard() {
                      return (
                        <div
                          key={analysis.id}
-                         className="flex items-center justify-between p-4 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+                         className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
                        >
-                          <div className="flex items-center gap-4 flex-1">
-                            <Badge variant="outline" className="font-mono">{analysis.symbol}</Badge>
-                            <Badge 
-                              variant={analysis.strategy_type === '1H+4H' ? 'default' : 'secondary'} 
-                              className="text-xs"
-                            >
-                              {analysis.strategy_type || '1H'}
-                            </Badge>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="outline" className="font-mono text-xs">{analysis.symbol}</Badge>
+                              <Badge 
+                                variant={analysis.strategy_type === '1H+4H' ? 'default' : 'secondary'} 
+                                className="text-xs"
+                              >
+                                {analysis.strategy_type || '1H'}
+                              </Badge>
+                            </div>
                             
-                            <div className="text-sm flex-1">
-                              <p className="font-medium">
+                            <div className="text-sm flex-1 min-w-0">
+                              <p className="font-medium truncate">
                                 {analysis.ai_analysis.recommendation.action} - {analysis.ai_analysis.recommendation.confidence}% confidence
                               </p>
-                              <p className="text-muted-foreground">
+                              <p className="text-muted-foreground text-xs">
                                 {new Date(analysis.created_at).toLocaleString()}
                               </p>
                             </div>
-                           
-                           {/* Session Information */}
-                           <div className="flex items-center gap-2">
-                             <Badge 
-                               variant={
-                                 sessionInfo.priority === 'highest' ? 'destructive' :
-                                 sessionInfo.priority === 'high' ? 'default' :
-                                 sessionInfo.priority === 'upcoming' ? 'secondary' :
-                                 'outline'
-                               }
-                               className="text-xs flex items-center gap-1"
-                             >
-                               <Timer className="h-3 w-3" />
-                               {sessionInfo.priority === 'upcoming' ? 'Upcoming' :
-                                sessionInfo.priority === 'highest' ? 'Peak Now' :
-                                sessionInfo.priority === 'high' ? 'Active' :
-                                sessionInfo.priority === 'medium' ? 'Good' : 'Low'}
-                             </Badge>
-                             
-                             <Dialog>
-                               <DialogTrigger asChild>
-                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                   <Info className="h-4 w-4" />
-                                 </Button>
-                               </DialogTrigger>
-                               <DialogContent className="max-w-md">
-                                 <DialogHeader>
-                                   <DialogTitle className="flex items-center gap-2">
-                                     <Clock className="h-5 w-5" />
-                                     Session Info for {analysis.symbol}
-                                   </DialogTitle>
-                                 </DialogHeader>
-                                 
-                                 <div className="space-y-4">
-                                   {/* Current Status */}
-                                   <div className="p-3 bg-muted/50 rounded-lg">
-                                     <div className="flex items-center justify-between mb-2">
-                                       <span className="text-sm font-medium">Current Status</span>
-                                       <Badge variant={sessionInfo.currentSession.status === 'active' ? 'default' : 'outline'}>
-                                         {sessionInfo.currentSession.name}
-                                       </Badge>
-                                     </div>
-                                     <p className="text-xs text-muted-foreground">
-                                       {sessionInfo.recommendation}
-                                     </p>
-                                   </div>
-                                   
-                                   {/* Next Session */}
-                                   <div className="p-3 bg-muted/50 rounded-lg">
-                                     <div className="flex items-center justify-between mb-2">
-                                       <span className="text-sm font-medium">Next Optimal</span>
-                                       <span className="text-sm font-mono">{sessionInfo.nextSession.time}</span>
-                                     </div>
-                                     <p className="text-xs text-muted-foreground">
-                                       {sessionInfo.nextSession.name} in {sessionInfo.nextSession.hoursUntil} hours
-                                     </p>
-                                   </div>
-                                   
-                                    {/* Trading Tip */}
-                                    <div className="p-3 border border-primary/20 bg-primary/5 rounded-lg">
-                                      <div className="flex items-start gap-2">
-                                        <AlertTriangle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                                        <div>
-                                          <p className="text-sm font-medium text-primary">Trading Tip for {analysis.symbol}</p>
-                                          <p className="text-xs text-muted-foreground mt-1">
-                                            {sessionInfo.pairData.recommendation}
-                                          </p>
-                                          <div className="mt-2 space-y-1">
-                                            <p className="text-xs text-muted-foreground">
-                                              <span className="font-medium">Characteristics:</span> {sessionInfo.pairData.characteristics}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                              <span className="font-medium">Volume:</span> {sessionInfo.pairData.optimalVolume}
-                                            </p>
-                                          </div>
-                                        </div>
+                          </div>
+                          
+                          {/* Session Information and Actions */}
+                          <div className="flex items-center justify-between sm:justify-end gap-2">
+                            <Badge 
+                              variant={
+                                sessionInfo.priority === 'highest' ? 'destructive' :
+                                sessionInfo.priority === 'high' ? 'default' :
+                                sessionInfo.priority === 'upcoming' ? 'secondary' :
+                                'outline'
+                              }
+                              className="text-xs flex items-center gap-1"
+                            >
+                              <Timer className="h-3 w-3" />
+                              <span className="hidden sm:inline">
+                                {sessionInfo.priority === 'upcoming' ? 'Upcoming' :
+                                 sessionInfo.priority === 'highest' ? 'Peak Now' :
+                                 sessionInfo.priority === 'high' ? 'Active' :
+                                 sessionInfo.priority === 'medium' ? 'Good' : 'Low'}
+                              </span>
+                              <span className="sm:hidden">
+                                {sessionInfo.priority === 'upcoming' ? 'Up' :
+                                 sessionInfo.priority === 'highest' ? 'Peak' :
+                                 sessionInfo.priority === 'high' ? 'Act' :
+                                 sessionInfo.priority === 'medium' ? 'Ok' : 'Low'}
+                              </span>
+                            </Badge>
+                            
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <Info className="h-4 w-4" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-md">
+                                  <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2">
+                                      <Clock className="h-5 w-5" />
+                                      Session Info for {analysis.symbol}
+                                    </DialogTitle>
+                                  </DialogHeader>
+                                  
+                                  <div className="space-y-4">
+                                    {/* Current Status */}
+                                    <div className="p-3 bg-muted/50 rounded-lg">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium">Current Status</span>
+                                        <Badge variant={sessionInfo.currentSession.status === 'active' ? 'default' : 'outline'}>
+                                          {sessionInfo.currentSession.name}
+                                        </Badge>
                                       </div>
+                                      <p className="text-xs text-muted-foreground">
+                                        {sessionInfo.recommendation}
+                                      </p>
                                     </div>
-                                 </div>
-                               </DialogContent>
-                             </Dialog>
-                           </div>
-                         </div>
-                         
-                         <div className="flex gap-2 ml-4">
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => loadAnalysis(analysis)}
-                           >
-                             Load
-                           </Button>
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => deleteAnalysis(analysis.id)}
-                             className="text-destructive hover:text-destructive"
-                           >
-                             <Trash2 className="h-4 w-4" />
-                           </Button>
-                         </div>
+                                    
+                                    {/* Next Session */}
+                                    <div className="p-3 bg-muted/50 rounded-lg">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium">Next Optimal</span>
+                                        <span className="text-sm font-mono">{sessionInfo.nextSession.time}</span>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground">
+                                        {sessionInfo.nextSession.name} in {sessionInfo.nextSession.hoursUntil} hours
+                                      </p>
+                                    </div>
+                                    
+                                     {/* Trading Tip */}
+                                     <div className="p-3 border border-primary/20 bg-primary/5 rounded-lg">
+                                       <div className="flex items-start gap-2">
+                                         <AlertTriangle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                                         <div>
+                                           <p className="text-sm font-medium text-primary">Trading Tip for {analysis.symbol}</p>
+                                           <p className="text-xs text-muted-foreground mt-1">
+                                             {sessionInfo.pairData.recommendation}
+                                           </p>
+                                           <div className="mt-2 space-y-1">
+                                             <p className="text-xs text-muted-foreground">
+                                               <span className="font-medium">Characteristics:</span> {sessionInfo.pairData.characteristics}
+                                             </p>
+                                             <p className="text-xs text-muted-foreground">
+                                               <span className="font-medium">Volume:</span> {sessionInfo.pairData.optimalVolume}
+                                             </p>
+                                           </div>
+                                         </div>
+                                       </div>
+                                     </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => loadAnalysis(analysis)}
+                                className="h-8 text-xs"
+                              >
+                                <span className="hidden sm:inline">Load</span>
+                                <Eye className="h-3 w-3 sm:hidden" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deleteAnalysis(analysis.id)}
+                                className="h-8 text-xs text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
                        </div>
                      );
                    })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                 </div>
+               )}
+             </CardContent>
+           </Card>
+         )}
 
         {/* Market Data Display */}
         {marketData && (
