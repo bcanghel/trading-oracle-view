@@ -17,12 +17,18 @@ export type Database = {
       auto_trades: {
         Row: {
           action: string
+          adr_used_today: number | null
           ai_confidence: number | null
+          algorithmic_strategy: string | null
           calculated_micro_lots: number | null
           calculated_pip_risk: number | null
           calculated_risk_amount: number | null
           closed_at: string | null
+          confluence_score: number | null
           created_at: string
+          deterministic_used: boolean | null
+          distance_to_vwap_bps: number | null
+          enhanced_features: Json | null
           entry_filled: boolean | null
           entry_filled_at: string | null
           entry_price: number
@@ -35,6 +41,7 @@ export type Database = {
           reward_pips: number | null
           risk_pips: number | null
           risk_reward_ratio: number | null
+          session_context: Json | null
           session_name: string
           status: string
           stop_loss: number
@@ -45,12 +52,18 @@ export type Database = {
         }
         Insert: {
           action: string
+          adr_used_today?: number | null
           ai_confidence?: number | null
+          algorithmic_strategy?: string | null
           calculated_micro_lots?: number | null
           calculated_pip_risk?: number | null
           calculated_risk_amount?: number | null
           closed_at?: string | null
+          confluence_score?: number | null
           created_at?: string
+          deterministic_used?: boolean | null
+          distance_to_vwap_bps?: number | null
+          enhanced_features?: Json | null
           entry_filled?: boolean | null
           entry_filled_at?: string | null
           entry_price: number
@@ -63,6 +76,7 @@ export type Database = {
           reward_pips?: number | null
           risk_pips?: number | null
           risk_reward_ratio?: number | null
+          session_context?: Json | null
           session_name: string
           status?: string
           stop_loss: number
@@ -73,12 +87,18 @@ export type Database = {
         }
         Update: {
           action?: string
+          adr_used_today?: number | null
           ai_confidence?: number | null
+          algorithmic_strategy?: string | null
           calculated_micro_lots?: number | null
           calculated_pip_risk?: number | null
           calculated_risk_amount?: number | null
           closed_at?: string | null
+          confluence_score?: number | null
           created_at?: string
+          deterministic_used?: boolean | null
+          distance_to_vwap_bps?: number | null
+          enhanced_features?: Json | null
           entry_filled?: boolean | null
           entry_filled_at?: string | null
           entry_price?: number
@@ -91,6 +111,7 @@ export type Database = {
           reward_pips?: number | null
           risk_pips?: number | null
           risk_reward_ratio?: number | null
+          session_context?: Json | null
           session_name?: string
           status?: string
           stop_loss?: number
