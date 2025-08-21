@@ -158,12 +158,12 @@ serve(async (req) => {
         });
         
         if (!deterministicResponse.ok) {
-          return { error: 'Both AI and deterministic analysis failed', response: null };
+          return { error: 'Both AI and deterministic analysis failed', response: null, enhancedFeatures: null, deterministicUsed: null, algorithmicStrategy: null };
         }
         
         const deterministicData = await deterministicResponse.json();
         if (!deterministicData.success) {
-          return { error: 'Deterministic analysis failed', response: null };
+          return { error: 'Deterministic analysis failed', response: null, enhancedFeatures: null, deterministicUsed: null, algorithmicStrategy: null };
         }
         
         console.log('✅ Using deterministic analysis as fallback');
@@ -179,7 +179,7 @@ serve(async (req) => {
         });
         
         if (!recommendation) {
-          return { error: 'No deterministic recommendation returned', response: null };
+          return { error: 'No deterministic recommendation returned', response: null, enhancedFeatures: null, deterministicUsed: null, algorithmicStrategy: null };
         }
         
         // Continue with existing risk management logic...
@@ -187,6 +187,12 @@ serve(async (req) => {
         const riskPips = Math.abs(recommendation.entry - recommendation.stopLoss) * pipMultiplier;
         const rewardPips = Math.abs(recommendation.takeProfit - recommendation.entry) * pipMultiplier;
         const rrRatio = rewardPips / riskPips;
+        
+        // Extract enhanced data from deterministic response
+        const enhancedFeatures = deterministicData.enhancedFeatures || null;
+        const confluenceScore = enhancedFeatures?.confluenceScore || 50;
+        const adrUsedToday = enhancedFeatures?.adrUsedToday || null;
+        const distanceToVWAP = enhancedFeatures?.distanceToVWAP || null;
         
         // Use deterministic values with existing validation
         return {
@@ -199,7 +205,15 @@ serve(async (req) => {
           rrRatio: rrRatio,
           riskPips: riskPips,
           rewardPips: rewardPips,
-          error: null
+          error: null,
+          // Enhanced data for storage
+          enhancedFeatures: enhancedFeatures,
+          confluenceScore: confluenceScore,
+          deterministicUsed: true,
+          algorithmicStrategy: recommendation.algorithmicStrategy || null,
+          adrUsedToday: adrUsedToday,
+          distanceToVWAP: distanceToVWAP,
+          sessionContext: sessionContext
         };
       }
 
@@ -207,7 +221,7 @@ serve(async (req) => {
       
       if (!analysisData.success) {
         console.error('Enhanced trading analysis failed:', analysisData.error);
-        return { error: 'Enhanced analysis failed', response: null };
+        return { error: 'Enhanced analysis failed', response: null, enhancedFeatures: null, deterministicUsed: null, algorithmicStrategy: null };
       }
 
       const recommendation = analysisData.recommendation;
@@ -218,11 +232,12 @@ serve(async (req) => {
         stopLoss: recommendation?.stopLoss || 'N/A',
         takeProfit: recommendation?.takeProfit || 'N/A',
         reasoning: recommendation?.reasoning || 'N/A',
-        enhancedFeatures: analysisData.enhancedFeatures ? 'Available' : 'N/A'
+        enhancedFeatures: analysisData.enhancedFeatures ? 'Available' : 'N/A',
+        confluenceScore: analysisData.enhancedFeatures?.confluenceScore || 'N/A'
       });
 
       if (!recommendation) {
-        return { error: 'No enhanced recommendation returned', response: null };
+        return { error: 'No enhanced recommendation returned', response: null, enhancedFeatures: null, deterministicUsed: null, algorithmicStrategy: null };
       }
 
       // Calculate pip-based risk management (50 pips max SL, 100 pips max TP, 2:1 R/R)
@@ -282,7 +297,7 @@ serve(async (req) => {
         adjustmentMade
       });
 
-      // Return analysis with adjusted values
+      // Return analysis with adjusted values and enhanced data
       const result = {
         action: recommendation.action,
         entry: recommendation.entry,
@@ -293,7 +308,15 @@ serve(async (req) => {
         rrRatio: finalRRRatio,
         riskPips: finalRiskPips,
         rewardPips: finalRewardPips,
-        error: null
+        error: null,
+        // Enhanced data for storage 
+        enhancedFeatures: analysisData.enhancedFeatures || null,
+        confluenceScore: analysisData.enhancedFeatures?.confluenceScore || 50,
+        deterministicUsed: false,
+        algorithmicStrategy: recommendation.algorithmicStrategy || null,
+        adrUsedToday: analysisData.enhancedFeatures?.adrUsedToday || null,
+        distanceToVWAP: analysisData.enhancedFeatures?.distanceToVWAP || null,
+        sessionContext: sessionContext
       };
 
       // Always generate trade regardless of confidence - we want 3 trades per day
@@ -589,7 +612,7 @@ serve(async (req) => {
           }
         });
         
-        // Prepare trade data with new order type fields
+        // Prepare trade data with enhanced features and all new columns
         const tradeData = {
           symbol,
           session_name: sessionName,
@@ -611,7 +634,15 @@ serve(async (req) => {
           calculated_micro_lots: lotSizeInfo10K.microLot,
           calculated_risk_amount: lotSizeInfo10K.riskAmount,
           calculated_pip_risk: lotSizeInfo10K.pipRisk,
-          next_check_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+          next_check_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+          // Enhanced analysis columns
+          enhanced_features: analysis?.enhancedFeatures || null,
+          confluence_score: analysis?.confluenceScore || 50,
+          session_context: analysis?.sessionContext || marketData.sessionContext || null,
+          deterministic_used: analysis?.deterministicUsed || false,
+          adr_used_today: analysis?.adrUsedToday || null,
+          distance_to_vwap_bps: analysis?.distanceToVWAP || null,
+          algorithmic_strategy: analysis?.algorithmicStrategy || null
         };
         
         const { data: trade, error } = await supabase
