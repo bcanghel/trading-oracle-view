@@ -67,8 +67,8 @@ const FOREX_PAIRS = [
 export function TradingDashboard() {
   const { toast } = useToast();
   const [selectedPair, setSelectedPair] = useState<string>("");
-  const [selectedStrategy, setSelectedStrategy] = useState<string>("1H");
-  const [useDeterministic, setUseDeterministic] = useState<boolean>(false);
+  // Always use enhanced multi-timeframe strategy (same as auto-trading)
+  const selectedStrategy = "1H+4H";
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [recommendation, setRecommendation] = useState<TradingRecommendation | null>(null);
@@ -404,30 +404,30 @@ export function TradingDashboard() {
 
     setIsAnalyzing(true);
     try {
-      // Get market data
-      const data = await fetchMarketData(selectedPair, selectedStrategy, useDeterministic);
+      // Get enhanced market data (same as auto-trading)
+      const data = await fetchMarketData(selectedPair, selectedStrategy, false);
       setMarketData(data.currentData);
       setHistoricalData(data.historicalData);
       setHistorical4hData(data.historical4hData || []);
       setCurrentStrategy(data.strategy || selectedStrategy);
 
-      // Get analysis (AI or deterministic)
+      // Get enhanced analysis (same as auto-trading but with limit order suggestions)
       const analysis = await analyzeTradingOpportunity(
         selectedPair,
         data.historicalData,
         data.currentData,
         data.historical4hData,
         selectedStrategy,
-        { useDeterministic, historical1dData: data.historical1dData }
+        { useDeterministic: false, historical1dData: data.historical1dData }
       );
 
-      // Check if AI analysis failed
+      // Check if analysis failed
       if (analysis.aiError) {
         setRecommendation(null);
         setAnalysisInputData(null);
         toast({
-          title: "AI Analysis Unavailable",
-          description: "AI analysis is currently unavailable. Please try again later.",
+          title: "Enhanced Analysis Unavailable",
+          description: "Enhanced trading analysis is currently unavailable. Please try again later.",
           variant: "destructive",
         });
         return;
@@ -580,8 +580,7 @@ export function TradingDashboard() {
   const loadAnalysis = (savedAnalysis: SavedAnalysis) => {
     const { api_response, ai_analysis } = savedAnalysis;
     setSelectedPair(savedAnalysis.symbol);
-    setSelectedStrategy(savedAnalysis.strategy_type || '1H');
-    setCurrentStrategy(savedAnalysis.strategy_type || '1H');
+    setCurrentStrategy('1H+4H'); // Always use enhanced strategy
     setMarketData(api_response.currentData);
     setHistoricalData(api_response.historicalData);
     setHistorical4hData(api_response.historical4hData || []);
@@ -663,34 +662,8 @@ export function TradingDashboard() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium block">Analysis Strategy</label>
-                    <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select strategy" />
-                      </SelectTrigger>
-                      <SelectContent className="z-50">
-                        <SelectItem value="1H">
-                          <div className="flex flex-col">
-                            <span>1H Strategy</span>
-                            <span className="text-xs text-muted-foreground">Standard (48x 1H candles)</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="1H+4H">
-                          <div className="flex flex-col">
-                            <span>1H+4H Strategy</span>
-                            <span className="text-xs text-muted-foreground">Enhanced (48x 1H + 12x 4H candles)</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="flex items-center gap-2 pt-1">
-                      <Switch id="deterministic" checked={useDeterministic} onCheckedChange={setUseDeterministic} />
-                      <Label htmlFor="deterministic" className="text-sm text-muted-foreground">Deterministic mode</Label>
-                    </div>
-                  </div>
-                  <div className="col-span-1 sm:col-span-2 lg:col-span-1 space-y-2 lg:space-y-0">
+                   </div>
+                   <div className="col-span-1 sm:col-span-2 lg:col-span-1 space-y-2 lg:space-y-0">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
                       <Button 
                         onClick={analyzeMarket} 
