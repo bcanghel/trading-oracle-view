@@ -22,117 +22,116 @@ export async function analyzeWithAI(
   const openAIApiKey = Deno.env.get('OPEN_AI_API');
   if (!openAIApiKey) throw new Error('OpenAI API key not configured');
 
-  // Helper: precision by symbol (simple heuristic)
-  const getPrecisionForSymbol = (sym: string) => {
-    if (/JPY/i.test(sym)) return { decimals: 3, pipSize: 0.01 };
-    if (/XAU|GOLD|XAG|SILVER/i.test(sym)) return { decimals: 2, pipSize: 0.1 };
-    return { decimals: 5, pipSize: 0.0001 };
-  };
+  const multiTimeframeContext = strategy === '1H+4H' && technicalAnalysis.multiTimeframe ? `
+## MULTI-TIMEFRAME ANALYSIS (1H + 4H Strategy)
+- Confluence Score: ${technicalAnalysis.multiTimeframe.confluence}%
+- Trend Agreement: ${technicalAnalysis.multiTimeframe.agreement ? 'YES' : 'NO'}
+- 4H Data: RSI=${technicalAnalysis.multiTimeframe.higher4h.rsi}, SMA10=${technicalAnalysis.multiTimeframe.higher4h.sma10}, Support=${technicalAnalysis.multiTimeframe.higher4h.support}, Resistance=${technicalAnalysis.multiTimeframe.higher4h.resistance}
 
-  const precision = getPrecisionForSymbol(symbol);
+**MULTI-TIMEFRAME REQUIREMENTS:**
+- Only consider high-confidence trades when confluence score > 60%
+- Both timeframes must align for trend-following strategies
+- Use 4H levels for major S/R, 1H for precise entries
+- Increase confidence significantly when both timeframes confirm signals
+` : '';
 
-  // Build structured input JSON (compact)
-  const input = {
-    symbol,
-    current: {
-      price: currentData.currentPrice,
-      high24h: currentData.high24h,
-      low24h: currentData.low24h,
-    },
-    ta: {
-      rsi: technicalAnalysis.rsi,
-      atr: technicalAnalysis.atr,
-      boll: technicalAnalysis.bollinger,
-      macd: technicalAnalysis.macd,
-      sma10: technicalAnalysis.sma10,
-      sma20: technicalAnalysis.sma20,
-      support: technicalAnalysis.support,
-      resistance: technicalAnalysis.resistance,
-    },
-    enhanced: {
-      ...(technicalAnalysis?.enhancedFeatures ?? {}),
-    },
-    trend: trendAnalysis,
-    sessionContext: {
-      minutesToEOD: (currentData?.sessionContext?.minutesToEOD ?? 600),
-      session: (currentData?.sessionContext?.session ?? marketSession?.name ?? 'Unknown'),
-      isWeekendOrHoliday: Boolean(currentData?.sessionContext?.isWeekendOrHoliday ?? false),
-    },
-    algo: {
-      strategy: algorithmicSuggestion.strategy,
-      action: algorithmicSuggestion.action,
-      entry: algorithmicSuggestion.entryPrice,
-      sl: algorithmicSuggestion.stopLoss,
-      tp: algorithmicSuggestion.takeProfit,
-      rr: algorithmicSuggestion.riskRewardRatio,
-    },
-    constraints: {
-      allowFlat: false,
-      minRr: 1.8,
-      minConfluence: 50,
-      strongConfluence: 60,
-      minMinutesToEOD: 120,
-      maxSpreadZ: 2.0,
-      minActivityScore: -1.0,
-      precision,
-      confidenceMap: {
-        base: 20,
-        k: 0.7,
-        bonusBreakout: 10,
-        bonusTrend: 5,
-        adrPenaltyThreshold: 80,
-        adrPenalty: 10,
-      },
-    },
-    strategyMode: strategy,
-  };
+  const strategyNote = strategy === '1H+4H' ? 'This analysis uses ENHANCED MULTI-TIMEFRAME strategy (1H + 4H)' : 'This analysis uses STANDARD 1H strategy';
+  
+  // Include enhanced features as compact JSON for the model to parse easily
+  const enhancedJson = JSON.stringify(technicalAnalysis?.enhancedFeatures ?? {}, null, 2);
 
-  const system = `
-You are a senior, risk-managed FX analyst. Output ONLY valid JSON per the provided schema.
-Rules:
-- Obey constraints: if allowFlat=true and any gate fails → action="FLAT".
-- Never invent data; only use fields provided in "input".
-- Entry must be a strategic level (SR zone edge, VWAP/EMA pullback, OR retest).
-- Only use current price for confirmed breakout (enhanced.squeeze=true AND enhanced.or60.state="break").
-- SL/TP must be ATR-based and beyond logical levels (SL outside zone by ≥0.2×ATR; TP at next major level or ≥minRr×ATR).
-- Confidence must be derived from confluenceScore (see mapping in input.constraints).
-- Respect instrument precision (decimals, pipSize) and round all price outputs accordingly.
-- Hard gates: Do not trade if minutesToEOD < minMinutesToEOD, or spreadZ > maxSpreadZ, or activityScore < minActivityScore, or confluenceScore < minConfluence (unless allowForce=false).
-- If strategyMode="1H+4H", do not go against bias4h unless confluenceScore ≥ strongConfluence.
-- Prefer VWAP/EMA pullback entries in trend; prefer OR60 break/retest for breakouts; allow mean reversion only if distanceToSRZone ≤ 0.15×ATR and adrUsedToday ≤ 85.
-- Confidence formula: confidence = clamp(base + k*confluenceScore + bonuses − penalties, 20, 90). Bonus: add bonusBreakout if enhanced.squeeze=true & enhanced.or60.state='break'; add bonusTrend if (enhanced.distToEMA100bps<0 and algo.action==='BUY' and enhanced.ema20Slope>0) or mirrored for SELL. Penalty: if adrUsedToday>adrPenaltyThreshold subtract adrPenalty.
-- Price sanity: abs(entry - current.price) ≤ 2.5 × ta.atr unless breakout path triggered; SL must be outside nearest SR zone by ≥ 0.2 × ta.atr; TP ≥ minRr × abs(entry - stopLoss) and not beyond next major SR zone by more than 3 × ta.atr.
-`;
+  const analysisPrompt = `
+You are an expert forex trading analyst with 15+ years of experience. Analyze ${symbol} and provide a strategic trading recommendation.
 
-  const response_format = {
-    type: "json_schema",
-    json_schema: {
-      name: "fx_recommendation",
-      schema: {
-        type: "object",
-        properties: {
-          action: { type: "string", enum: ["BUY","SELL","FLAT"] },
-          confidence: { type: "integer", minimum: 20, maximum: 95 },
-          entry: { type: "number" },
-          stopLoss: { type: "number" },
-          takeProfit: { type: "number" },
-          support: { type: "number" },
-          resistance: { type: "number" },
-          reasoning: { type: "string", minLength: 40 },
-          riskReward: { type: "number", minimum: 1.5 },
-          entryConditions: { type: "string" },
-          entryTiming: { type: "string" },
-          volumeConfirmation: { type: "string" },
-          candlestickSignals: { type: "string" }
-        },
-        required: [
-          "action","confidence","entry","stopLoss","takeProfit","support","resistance","reasoning","riskReward"
-        ],
-        additionalProperties: false
-      },
-      strict: true
-    }
-  } as const;
+${strategyNote}
+${multiTimeframeContext}
+
+ALGORITHMIC ASSISTANT REFERENCE:
+- Suggested Strategy: ${algorithmicSuggestion.strategy}
+- Suggested Action: ${algorithmicSuggestion.action}
+- Calculated Entry: ${algorithmicSuggestion.entryPrice}
+- Calculated SL/TP: ${algorithmicSuggestion.stopLoss} / ${algorithmicSuggestion.takeProfit}
+- Risk/Reward: ${algorithmicSuggestion.riskRewardRatio}:1
+- Reasoning: ${algorithmicSuggestion.reasoning.join('. ')}
+
+ENHANCED MARKET DATA:
+**Price Action:**
+- Symbol: ${symbol} | Current: ${currentData.currentPrice}
+- 24h: ${currentData.changePercent}% (High: ${currentData.high24h}, Low: ${currentData.low24h})
+
+**Technical Indicators:**
+- Moving Averages: SMA10=${technicalAnalysis.sma10}, SMA20=${technicalAnalysis.sma20}
+- Momentum: RSI=${technicalAnalysis.rsi}, MACD=${technicalAnalysis.macd?.macd} (Signal: ${technicalAnalysis.macd?.signal}, Histogram: ${technicalAnalysis.macd?.histogram})
+- Volatility: ATR=${technicalAnalysis.atr} (${technicalAnalysis.volatility?.atrPercentage}%), Status=${technicalAnalysis.volatility?.status}
+- Bollinger: Upper=${technicalAnalysis.bollinger?.upper}, Middle=${technicalAnalysis.bollinger?.middle}, Lower=${technicalAnalysis.bollinger?.lower}
+- Key Levels: Support=${technicalAnalysis.support}, Resistance=${technicalAnalysis.resistance}
+- Pivots: R1=${technicalAnalysis.pivotPoints?.r1}, Pivot=${technicalAnalysis.pivotPoints?.pivot}, S1=${technicalAnalysis.pivotPoints?.s1}
+- Fibonacci: 23.6%=${technicalAnalysis.fibonacci?.level236}, 38.2%=${technicalAnalysis.fibonacci?.level382}, 61.8%=${technicalAnalysis.fibonacci?.level618}
+- Swings: High=${technicalAnalysis.swingLevels?.swingHigh}, Low=${technicalAnalysis.swingLevels?.swingLow}
+
+**Enhanced Features (JSON):**
+${enhancedJson}
+
+**Trend & Pattern Analysis:**
+- Trend: ${trendAnalysis.overallTrend} (Strength: ${trendAnalysis.trendStrength})
+- Structure: Higher Highs=${trendAnalysis.higherHighs ? 'YES' : 'NO'}, Higher Lows=${trendAnalysis.higherLows ? 'YES' : 'NO'}
+- Momentum: ${trendAnalysis.momentum}
+- Patterns: ${trendAnalysis.candlePatterns}
+- Volume: ${trendAnalysis.volumeTrend}
+
+**Session Context:**
+- Time: ${romaniaTime.toLocaleString('en-US', { timeZone: 'Europe/Bucharest', hour12: false })}
+- Session: ${marketSession.name} (${marketSession.status})
+- Volatility: ${marketSession.volatility} | Recommendation: ${marketSession.recommendation}
+
+**CRITICAL ENTRY STRATEGY RULES:**
+🚨 **STRATEGIC ENTRY PRIORITY - DO NOT DEFAULT TO CURRENT PRICE**
+🎯 **ENTRY LEVEL SELECTION PRIORITY:**
+1. **PULLBACK ENTRIES**: Wait for retracements to key support/resistance levels
+2. **FIBONACCI RETRACEMENTS**: Use 38.2%, 50%, or 61.8% levels for entries
+3. **MOVING AVERAGE TESTS**: Enter on pullbacks to SMA10, SMA20, or EMA levels
+4. **BOLLINGER BAND EXTREMES**: Enter at upper/lower bands for mean reversion
+5. **PIVOT POINT LEVELS**: Use daily pivots, S1/R1 for strategic entries
+6. **SUPPORT/RESISTANCE RETESTS**: Enter on retests of broken levels
+7. **CURRENT PRICE**: ONLY if immediate breakout momentum or no better levels available
+
+**EXPERT ANALYSIS FRAMEWORK:**
+1. **Technical Confluence:** Identify 3+ confirming signals from different indicator categories
+2. **Risk Management:** Ensure R:R ratio ≥ 2:1, position at logical S/R levels
+3. **Timing Precision:** Consider session volatility, news events, and momentum shifts
+4. **Entry Strategy:** PRIORITIZE strategic levels over current price for limit orders
+5. **Market Structure:** Use major S/R levels for entry, stop loss, and take profit placement
+
+**CONFIDENCE SCORING:**
+- 80-95%: Multiple strong confluences, clear direction, favorable session
+- 60-79%: Good setup with some confirmation, acceptable risk
+- 40-59%: Moderate setup, higher risk, requires tight management
+- 20-39%: Weak setup, only consider if forced to choose direction
+
+Respond with ONLY this JSON structure:
+{
+  "action": "BUY or SELL (must choose one - HOLD not allowed)",
+  "confidence": "integer 20-95 based on technical confluence and market conditions",
+  "entry": "number - STRATEGIC entry price (prefer pullback/retracement levels over current price ${currentData.currentPrice})",
+  "stopLoss": "number - logical stop beyond key level",
+  "takeProfit": "number - target at next major S/R or 2+ R:R",
+  "support": "number - most critical support you identify",
+  "resistance": "number - most critical resistance you identify",
+  "reasoning": "detailed explanation referencing specific technical confluences and WHY you chose this entry level",
+  "riskReward": "number - calculated R:R ratio (minimum 2.0)",
+  "entryConditions": "specific trigger conditions for entry (candlestick patterns, level breaks, etc.)",
+  "entryTiming": "session-specific timing guidance and liquidity considerations",
+  "volumeConfirmation": "volume requirements and signals to confirm entry",
+  "candlestickSignals": "specific candlestick patterns to watch for confirmation"
+}
+
+**CRITICAL REQUIREMENTS:**
+- **ENTRY MUST BE STRATEGIC**: Choose pullback/retracement/technical levels, NOT current price (${currentData.currentPrice}) unless justified breakout
+- Must explain WHY this entry level is better than current market price
+- Risk/reward must be ≥ 2:1
+- Consider session timing and volatility in your analysis
+- Reference multiple timeframes if using 1H+4H strategy
+- Justify strategic limit order approach over market execution`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -143,11 +142,11 @@ Rules:
     body: JSON.stringify({
       model: 'gpt-4.1-2025-04-14',
       messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: JSON.stringify({ input }) }
+        { role: 'system', content: 'You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.' },
+        { role: 'user', content: analysisPrompt }
       ],
-      response_format,
-      max_completion_tokens: 800,
+      max_completion_tokens: 2000,
+      response_format: { type: "json_object" },
     }),
   });
 
@@ -164,23 +163,6 @@ Rules:
     if (!recommendation.action || !recommendation.confidence || !recommendation.entry) {
       throw new Error('Missing required fields in AI response');
     }
-
-    // Round to instrument precision
-    const d = precision.decimals;
-    const round = (n: number) => parseFloat(Number(n).toFixed(d));
-    recommendation.entry = round(recommendation.entry);
-    recommendation.stopLoss = round(recommendation.stopLoss);
-    recommendation.takeProfit = round(recommendation.takeProfit);
-    recommendation.support = round(recommendation.support);
-    recommendation.resistance = round(recommendation.resistance);
-
-    // Optional blend with deterministic signal
-    const dirAgree = recommendation.action === (algorithmicSuggestion.action === 'BUY' ? 'BUY' : (algorithmicSuggestion.action === 'SELL' ? 'SELL' : recommendation.action));
-    const rrOk = Number(recommendation.riskReward) >= 1.8;
-    if (!dirAgree || !rrOk) {
-      recommendation.confidence = Math.max(20, Math.min(recommendation.confidence, 55));
-    }
-
     recommendation.algorithmicStrategy = algorithmicSuggestion.strategy;
     recommendation.algorithmicPositionSize = algorithmicSuggestion.positionSize;
     return recommendation;
