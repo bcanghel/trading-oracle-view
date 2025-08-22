@@ -578,21 +578,46 @@ export function TradingDashboard() {
   };
 
   const loadAnalysis = (savedAnalysis: SavedAnalysis) => {
-    const { api_response, ai_analysis } = savedAnalysis;
-    setSelectedPair(savedAnalysis.symbol);
-    setCurrentStrategy('1H+4H'); // Always use enhanced strategy
-    setMarketData(api_response.currentData);
-    setHistoricalData(api_response.historicalData);
-    setHistorical4hData(api_response.historical4hData || []);
-    setRecommendation(ai_analysis.recommendation);
-    setAnalysisInputData({
-      symbol: savedAnalysis.symbol,
-      currentData: api_response.currentData,
-      historicalData: api_response.historicalData,
-      historical4hData: api_response.historical4hData,
-      technicalAnalysis: ai_analysis.technicalAnalysis,
-      strategy: savedAnalysis.strategy_type || '1H'
-    });
+    console.log('Load Analysis clicked:', savedAnalysis);
+    
+    try {
+      const { api_response, ai_analysis } = savedAnalysis;
+      
+      console.log('API Response:', api_response);
+      console.log('AI Analysis:', ai_analysis);
+      
+      setSelectedPair(savedAnalysis.symbol);
+      setCurrentStrategy('1H+4H'); // Always use enhanced strategy
+      setMarketData(api_response.currentData);
+      setHistoricalData(api_response.historicalData);
+      setHistorical4hData(api_response.historical4hData || []);
+      setRecommendation(ai_analysis.recommendation);
+      setAnalysisInputData({
+        symbol: savedAnalysis.symbol,
+        currentData: api_response.currentData,
+        historicalData: api_response.historicalData,
+        historical4hData: api_response.historical4hData,
+        technicalAnalysis: ai_analysis.technicalAnalysis,
+        trendAnalysis: ai_analysis.trendAnalysis,
+        marketSession: ai_analysis.marketSession,
+        strategy: savedAnalysis.strategy_type || '1H'
+      });
+      
+      console.log('Analysis loaded successfully');
+      
+      toast({
+        title: "Analysis Loaded",
+        description: `Loaded ${savedAnalysis.symbol} analysis from ${new Date(savedAnalysis.created_at).toLocaleString()}`,
+      });
+      
+    } catch (error) {
+      console.error('Error loading analysis:', error);
+      toast({
+        title: "Error Loading Analysis",
+        description: "Failed to load the saved analysis. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
