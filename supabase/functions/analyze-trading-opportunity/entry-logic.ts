@@ -85,20 +85,50 @@ function calculateTrendFollowingEntry(conditions: MarketConditions): EntrySignal
     
     if (trendAnalysis.overallTrend === 'BULLISH' && currentPrice > technicalAnalysis.sma20 && technicalAnalysis.sma10 > technicalAnalysis.sma20) {
         action = 'BUY';
-        const stopLoss = currentPrice - (atr * 2);
-        // IMPROVEMENT: Target the next major resistance level for a more dynamic take profit
-        const takeProfit = technicalAnalysis.resistance > currentPrice ? technicalAnalysis.resistance : currentPrice + (atr * 4);
-        reasoning.push('Strong bullish trend identified.', 'Price is above key moving averages.', `Take profit set at resistance level: ${takeProfit}`);
-        return createSignal(action, currentPrice, stopLoss, takeProfit, atr, technicalAnalysis.confidenceScore, 'TREND_FOLLOWING', reasoning);
+        
+        // Strategic entry: Wait for pullback to key support levels
+        let entryPrice = currentPrice;
+        const sma20Level = technicalAnalysis.sma20;
+        const fibLevel = technicalAnalysis.fibonacci?.level_382 || (currentPrice - (atr * 1.2));
+        const supportLevel = technicalAnalysis.support;
+        
+        // Choose the best strategic entry level closest to current price but offering value
+        const potentialEntries = [sma20Level, fibLevel, supportLevel].filter(level => level < currentPrice && level > currentPrice - (atr * 2));
+        if (potentialEntries.length > 0) {
+            entryPrice = Math.max(...potentialEntries); // Highest level below current price
+            reasoning.push('Strong bullish trend identified.', `Strategic entry at ${entryPrice.toFixed(5)} - waiting for pullback to key support level.`);
+        } else {
+            reasoning.push('Strong bullish trend identified.', 'No significant pullback expected - market entry recommended.');
+        }
+        
+        const stopLoss = entryPrice - (atr * 2);
+        const takeProfit = technicalAnalysis.resistance > entryPrice ? technicalAnalysis.resistance : entryPrice + (atr * 4);
+        reasoning.push(`Take profit set at resistance level: ${takeProfit.toFixed(5)}`);
+        return createSignal(action, entryPrice, stopLoss, takeProfit, atr, technicalAnalysis.confidenceScore, 'TREND_FOLLOWING', reasoning);
     }
     
     if (trendAnalysis.overallTrend === 'BEARISH' && currentPrice < technicalAnalysis.sma20 && technicalAnalysis.sma10 < technicalAnalysis.sma20) {
         action = 'SELL';
-        const stopLoss = currentPrice + (atr * 2);
-        // IMPROVEMENT: Target the next major support level
-        const takeProfit = technicalAnalysis.support < currentPrice ? technicalAnalysis.support : currentPrice - (atr * 4);
-        reasoning.push('Strong bearish trend identified.', 'Price is below key moving averages.', `Take profit set at support level: ${takeProfit}`);
-        return createSignal(action, currentPrice, stopLoss, takeProfit, atr, technicalAnalysis.confidenceScore, 'TREND_FOLLOWING', reasoning);
+        
+        // Strategic entry: Wait for pullback to key resistance levels
+        let entryPrice = currentPrice;
+        const sma20Level = technicalAnalysis.sma20;
+        const fibLevel = technicalAnalysis.fibonacci?.level_618 || (currentPrice + (atr * 1.2));
+        const resistanceLevel = technicalAnalysis.resistance;
+        
+        // Choose the best strategic entry level closest to current price but offering value
+        const potentialEntries = [sma20Level, fibLevel, resistanceLevel].filter(level => level > currentPrice && level < currentPrice + (atr * 2));
+        if (potentialEntries.length > 0) {
+            entryPrice = Math.min(...potentialEntries); // Lowest level above current price
+            reasoning.push('Strong bearish trend identified.', `Strategic entry at ${entryPrice.toFixed(5)} - waiting for pullback to key resistance level.`);
+        } else {
+            reasoning.push('Strong bearish trend identified.', 'No significant pullback expected - market entry recommended.');
+        }
+        
+        const stopLoss = entryPrice + (atr * 2);
+        const takeProfit = technicalAnalysis.support < entryPrice ? technicalAnalysis.support : entryPrice - (atr * 4);
+        reasoning.push(`Take profit set at support level: ${takeProfit.toFixed(5)}`);
+        return createSignal(action, entryPrice, stopLoss, takeProfit, atr, technicalAnalysis.confidenceScore, 'TREND_FOLLOWING', reasoning);
     }
     
     return createHoldSignal(currentPrice, 'Trend conditions not met.');
@@ -111,19 +141,54 @@ function calculateMeanReversionEntry(conditions: MarketConditions): EntrySignal 
     
     if (technicalAnalysis.rsi < 30 && currentPrice <= technicalAnalysis.bollinger.lower) {
         const action = 'BUY';
-        const stopLoss = currentPrice - (atr * 1.5);
-        // IMPROVEMENT: Target is still the mean (middle band), which is logical for this strategy.
+        
+        // Strategic entry: Wait for deeper oversold levels or key support confluence
+        let entryPrice = currentPrice;
+        const lowerBandLevel = technicalAnalysis.bollinger.lower;
+        const supportLevel = technicalAnalysis.support;
+        const deepOversoldLevel = currentPrice - (atr * 0.5); // Slightly lower for better entry
+        
+        // Choose the most strategic entry point
+        const potentialEntries = [lowerBandLevel, supportLevel, deepOversoldLevel].filter(level => level <= currentPrice);
+        if (potentialEntries.length > 0) {
+            entryPrice = Math.min(...potentialEntries); // Lowest level for best value
+            if (entryPrice < currentPrice) {
+                reasoning.push('RSI is oversold (<30).', `Strategic entry at ${entryPrice.toFixed(5)} - waiting for deeper oversold level or support confluence.`);
+            } else {
+                reasoning.push('RSI is oversold (<30).', 'Price is at optimal oversold entry level.');
+            }
+        }
+        
+        const stopLoss = entryPrice - (atr * 1.5);
         const takeProfit = technicalAnalysis.bollinger.middle;
-        reasoning.push('RSI is oversold (<30).', 'Price is at or below the lower Bollinger Band.');
-        return createSignal(action, currentPrice, stopLoss, takeProfit, atr, technicalAnalysis.confidenceScore, 'MEAN_REVERSION', reasoning);
+        reasoning.push(`Target mean reversion to middle Bollinger Band: ${takeProfit.toFixed(5)}`);
+        return createSignal(action, entryPrice, stopLoss, takeProfit, atr, technicalAnalysis.confidenceScore, 'MEAN_REVERSION', reasoning);
     }
     
     if (technicalAnalysis.rsi > 70 && currentPrice >= technicalAnalysis.bollinger.upper) {
         const action = 'SELL';
-        const stopLoss = currentPrice + (atr * 1.5);
+        
+        // Strategic entry: Wait for higher overbought levels or key resistance confluence
+        let entryPrice = currentPrice;
+        const upperBandLevel = technicalAnalysis.bollinger.upper;
+        const resistanceLevel = technicalAnalysis.resistance;
+        const deepOverboughtLevel = currentPrice + (atr * 0.5); // Slightly higher for better entry
+        
+        // Choose the most strategic entry point
+        const potentialEntries = [upperBandLevel, resistanceLevel, deepOverboughtLevel].filter(level => level >= currentPrice);
+        if (potentialEntries.length > 0) {
+            entryPrice = Math.max(...potentialEntries); // Highest level for best value
+            if (entryPrice > currentPrice) {
+                reasoning.push('RSI is overbought (>70).', `Strategic entry at ${entryPrice.toFixed(5)} - waiting for deeper overbought level or resistance confluence.`);
+            } else {
+                reasoning.push('RSI is overbought (>70).', 'Price is at optimal overbought entry level.');
+            }
+        }
+        
+        const stopLoss = entryPrice + (atr * 1.5);
         const takeProfit = technicalAnalysis.bollinger.middle;
-        reasoning.push('RSI is overbought (>70).', 'Price is at or above the upper Bollinger Band.');
-        return createSignal(action, currentPrice, stopLoss, takeProfit, atr, technicalAnalysis.confidenceScore, 'MEAN_REVERSION', reasoning);
+        reasoning.push(`Target mean reversion to middle Bollinger Band: ${takeProfit.toFixed(5)}`);
+        return createSignal(action, entryPrice, stopLoss, takeProfit, atr, technicalAnalysis.confidenceScore, 'MEAN_REVERSION', reasoning);
     }
 
     return createHoldSignal(currentPrice, 'Mean reversion conditions not met.');
