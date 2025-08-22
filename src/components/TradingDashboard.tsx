@@ -418,7 +418,7 @@ export function TradingDashboard() {
         data.currentData,
         data.historical4hData,
         selectedStrategy,
-        { useDeterministic: false, historical1dData: data.historical1dData }
+         { useDeterministic: false, historical1dData: data.historical1dData }
       );
 
       // Check if analysis failed
