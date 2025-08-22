@@ -56,7 +56,7 @@ ALGORITHMIC ASSISTANT REFERENCE:
 
 ENHANCED MARKET DATA:
 **Price Action:**
-- Symbol: ${symbol} | Current: ${currentData.currentPrice} ⚠️ USE THIS AS ENTRY PRICE
+- Symbol: ${symbol} | Current: ${currentData.currentPrice}
 - 24h: ${currentData.changePercent}% (High: ${currentData.high24h}, Low: ${currentData.low24h})
 
 **Technical Indicators:**
@@ -84,11 +84,24 @@ ${enhancedJson}
 - Session: ${marketSession.name} (${marketSession.status})
 - Volatility: ${marketSession.volatility} | Recommendation: ${marketSession.recommendation}
 
+**CRITICAL ENTRY STRATEGY RULES:**
+🚨 **NEVER USE CURRENT MARKET PRICE AS ENTRY UNLESS THERE'S IMMEDIATE BREAKOUT/MOMENTUM**
+🎯 **ALWAYS PRIORITIZE STRATEGIC LIMIT ORDER LEVELS FOR BETTER RISK/REWARD**
+
+**ENTRY LEVEL SELECTION PRIORITY:**
+1. **PULLBACK ENTRIES**: Wait for retracements to key support/resistance levels
+2. **FIBONACCI RETRACEMENTS**: Use 38.2%, 50%, or 61.8% levels for entries
+3. **MOVING AVERAGE TESTS**: Enter on pullbacks to SMA10, SMA20, or EMA levels
+4. **BOLLINGER BAND EXTREMES**: Enter at upper/lower bands for mean reversion
+5. **PIVOT POINT LEVELS**: Use daily pivots, S1/R1 for strategic entries
+6. **SUPPORT/RESISTANCE RETESTS**: Enter on retests of broken levels
+7. **CURRENT PRICE**: ONLY if immediate breakout momentum or no better levels available
+
 **EXPERT ANALYSIS FRAMEWORK:**
 1. **Technical Confluence:** Identify 3+ confirming signals from different indicator categories
 2. **Risk Management:** Ensure R:R ratio ≥ 2:1, position at logical S/R levels
 3. **Timing Precision:** Consider session volatility, news events, and momentum shifts
-4. **Entry Strategy:** Choose optimal entry - current price for immediate execution OR strategic level for better R:R
+4. **Entry Strategy:** PRIORITIZE strategic levels over current price for limit orders
 5. **Market Structure:** Use major S/R levels for entry, stop loss, and take profit placement
 
 **CONFIDENCE SCORING:**
@@ -101,12 +114,12 @@ Respond with ONLY this JSON structure:
 {
   "action": "BUY or SELL (must choose one - HOLD not allowed)",
   "confidence": "integer 20-95 based on technical confluence and market conditions",
-  "entry": "number - optimal entry price (current: ${currentData.currentPrice} or strategic level)",
+  "entry": "number - STRATEGIC entry price (NOT current price unless breakout momentum - prioritize pullback/retracement levels)",
   "stopLoss": "number - logical stop beyond key level",
   "takeProfit": "number - target at next major S/R or 1.5+ R:R",
   "support": "number - most critical support you identify",
   "resistance": "number - most critical resistance you identify",
-  "reasoning": "detailed explanation referencing specific technical confluences and market structure",
+  "reasoning": "detailed explanation referencing specific technical confluences and WHY you chose this entry level over current price",
   "riskReward": "number - calculated R:R ratio (minimum 1.5)",
   "entryConditions": "specific trigger conditions for entry (candlestick patterns, level breaks, etc.)",
   "entryTiming": "session-specific timing guidance and liquidity considerations",
@@ -115,12 +128,12 @@ Respond with ONLY this JSON structure:
 }
 
 **CRITICAL REQUIREMENTS:**
-- Choose entry price strategically: use current price (${currentData.currentPrice}) for immediate execution OR better technical level for improved R:R
-- Must justify confidence score with specific technical confluences  
+- **ENTRY PRICE MUST BE STRATEGIC**: Choose pullback/retracement levels, NOT current price (${currentData.currentPrice}) unless immediate breakout
+- Must justify WHY you chose this entry level and WHY it's better than current market price
 - Risk/reward must be ≥ 2:1
 - Consider session timing and volatility in your analysis
 - Reference multiple timeframes if using 1H+4H strategy
-- Explain entry rationale: market vs limit order strategy`;
+- Explain entry rationale: limit order strategy preferred over market execution`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
