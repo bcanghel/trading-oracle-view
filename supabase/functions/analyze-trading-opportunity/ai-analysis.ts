@@ -95,6 +95,14 @@ ${enhancedJson}
 6. **SUPPORT/RESISTANCE RETESTS**: Enter on retests of broken levels
 7. **CURRENT PRICE**: ONLY if immediate breakout momentum or no better levels available
 
+**STOP LOSS & TAKE PROFIT RULES (Flexible, Not Fixed):**
+- Anchor SL just beyond the logical invalidation level: for BUY below nearest swing low or SR zone edge; for SELL above nearest swing high or SR zone edge; add buffer ≥ 0.2×ATR.
+- Do NOT default to 50 pips. Typical SL range is 30–50 pips on majors, but smaller is allowed if protected by structure and still achieves ≥ 2:1 R:R.
+- Breakouts: place SL beyond the breakout level with ≥ 0.2×ATR buffer. Retests/pullbacks: SL beyond the retested level.
+- TP must be ≥ 2 × risk (in pips) and preferably at the next major S/R; avoid unrealistic targets far beyond structure/ADR.
+- Sanity: |entry − current price| ≤ 2.5×ATR unless a confirmed breakout justifies otherwise.
+- Precision: Round entry/SL/TP/support/resistance to realistic instrument precision (e.g., 5 decimals for non-JPY, 3 for JPY).
+
 **EXPERT ANALYSIS FRAMEWORK:**
 1. **Technical Confluence:** Identify 3+ confirming signals from different indicator categories
 2. **Risk Management:** Ensure R:R ratio ≥ 2:1, position at logical S/R levels
