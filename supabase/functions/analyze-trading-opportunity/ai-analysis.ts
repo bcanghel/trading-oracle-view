@@ -67,13 +67,15 @@ You are an expert forex trading analyst with 15+ years of experience. Analyze ${
 ${strategyNote}
 ${multiTimeframeContext}
 
-ALGORITHMIC ASSISTANT REFERENCE:
+ALGORITHMIC REFERENCE (For guidance only - make your own decisions):
 - Suggested Strategy: ${algorithmicSuggestion.strategy}
 - Suggested Action: ${algorithmicSuggestion.action}
-- Calculated Entry: ${algorithmicSuggestion.entryPrice}
-- Calculated SL/TP: ${algorithmicSuggestion.stopLoss} / ${algorithmicSuggestion.takeProfit}
-- Risk/Reward: ${algorithmicSuggestion.riskRewardRatio}:1
-- Reasoning: ${algorithmicSuggestion.reasoning.join('. ')}
+- Reference Entry: ${algorithmicSuggestion.entryPrice}
+- Reference SL/TP: ${algorithmicSuggestion.stopLoss} / ${algorithmicSuggestion.takeProfit}
+- Reference R:R: ${algorithmicSuggestion.riskRewardRatio}:1
+- Algorithmic Logic: ${algorithmicSuggestion.reasoning.join('. ')}
+
+**NOTE**: These are reference suggestions only. You must analyze all technical data independently and make your own decisions on entry, stop loss, and take profit levels based on the complete technical picture provided below.
 
 ENHANCED MARKET DATA:
 **Price Action:**
@@ -112,10 +114,13 @@ ${fundBias ? `**USD FUNDAMENTALS ANALYSIS:**
 - **IMPORTANT**: Factor this fundamental bias into your technical analysis confidence and direction bias.` : ''}
 
 **CRITICAL ENTRY STRATEGY RULES:**
-🚨 **STRATEGIC ENTRY PRIORITY - DO NOT DEFAULT TO CURRENT PRICE**
-🎯 **ENTRY LEVEL SELECTION PRIORITY:**
+🚨 **CRITICAL DECISION-MAKING PRIORITY**
+🎯 **You are the primary analyst - make independent decisions based on technical analysis**
+🤖 **The algorithmic reference above is advisory only - do not simply copy its levels**
+
+**ENTRY LEVEL SELECTION PRIORITY:**
 1. **PULLBACK ENTRIES**: Wait for retracements to key support/resistance levels
-2. **FIBONACCI RETRACEMENTS**: Use 38.2%, 50%, or 61.8% levels for entries
+2. **FIBONACCI RETRACEMENTS**: Use 38.2%, 50%, or 61.8% levels for strategic entries
 3. **MOVING AVERAGE TESTS**: Enter on pullbacks to SMA10, SMA20, or EMA levels
 4. **BOLLINGER BAND EXTREMES**: Enter at upper/lower bands for mean reversion
 5. **PIVOT POINT LEVELS**: Use daily pivots, S1/R1 for strategic entries
@@ -162,12 +167,13 @@ Respond with ONLY this JSON structure:
 }
 
 **CRITICAL REQUIREMENTS:**
-- **ENTRY MUST BE STRATEGIC**: Choose pullback/retracement/technical levels, NOT current price (${currentData.currentPrice}) unless justified breakout
-- Must explain WHY this entry level is better than current market price
-- Risk/reward must be within 1.5–2.5; prefer 1.75–2.25; never exceed 2.5
-- Consider session timing and volatility in your analysis
-- Reference multiple timeframes if using 1H+4H strategy
-- Justify strategic limit order approach over market execution`;
+- **INDEPENDENT ANALYSIS**: Do not copy algorithmic reference levels - analyze the technical data yourself
+- **STRATEGIC ENTRY**: Choose pullback/retracement/technical levels based on S/R, Fibonacci, MA levels
+- **JUSTIFY ENTRY CHOICE**: Explain WHY your entry level is superior to current price (${currentData.currentPrice})
+- **R:R COMPLIANCE**: Must be within 1.5–2.5; prefer 1.75–2.25; never exceed 2.5
+- **TECHNICAL FOUNDATION**: Base SL/TP on swing levels, S/R zones, and technical structure
+- **SESSION AWARENESS**: Consider session timing and volatility in your analysis
+- **MULTI-TIMEFRAME**: Reference both 1H and 4H timeframes if using 1H+4H strategy`;
 
   let response;
   
