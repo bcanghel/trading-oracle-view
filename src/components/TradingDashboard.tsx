@@ -33,6 +33,12 @@ interface TradingRecommendation {
   candlestickSignals?: string;
   aiProvider?: 'claude' | 'openai';
   aiModel?: string;
+  fundamentalBias?: {
+    overallBias: "BULLISH" | "BEARISH" | "NEUTRAL";
+    strength: number;
+    summary: string;
+    keyEvents: string[];
+  };
 }
 
 interface MarketData {
@@ -812,6 +818,11 @@ export function TradingDashboard() {
                                     (Fill: {Math.round(analysis.ai_analysis.confidence.p_fill * 100)}%)
                                   </span>
                                 )}
+                                {analysis.ai_analysis.recommendation.fundamentalBias && (
+                                  <Badge variant="outline" className="text-xs ml-1 px-1">
+                                    📊 Fund
+                                  </Badge>
+                                )}
                               </p>
                               <p className="text-muted-foreground text-xs">
                                 {new Date(analysis.created_at).toLocaleString()}
@@ -1196,6 +1207,19 @@ export function TradingDashboard() {
                     </span>
                   )}
                 </div>
+                {recommendation.fundamentalBias && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    <Badge variant="outline" className="text-xs px-2 py-0.5">
+                      📊 Fundamentals: {recommendation.fundamentalBias.overallBias} 
+                      ({recommendation.fundamentalBias.strength}/100)
+                    </Badge>
+                    {recommendation.fundamentalBias.keyEvents?.length > 0 && (
+                      <span className="ml-2">
+                        Key: {recommendation.fundamentalBias.keyEvents.slice(0, 2).join(", ")}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="text-sm text-muted-foreground">
                   Risk/Reward: <span className="font-semibold">1:{recommendation.riskReward.toFixed(2)}</span>
                 </div>
