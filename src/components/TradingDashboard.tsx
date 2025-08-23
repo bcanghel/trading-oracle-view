@@ -75,6 +75,7 @@ export function TradingDashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [recommendation, setRecommendation] = useState<TradingRecommendation | null>(null);
+  const [confidenceScoring, setConfidenceScoring] = useState<any>(null);
   const [historicalData, setHistoricalData] = useState<any[]>([]);
   const [historical4hData, setHistorical4hData] = useState<any[]>([]);
   const [currentStrategy, setCurrentStrategy] = useState<string>("1H");
@@ -428,6 +429,7 @@ export function TradingDashboard() {
       // Check if analysis failed
       if (analysis.aiError) {
         setRecommendation(null);
+        setConfidenceScoring(null);
         setAnalysisInputData(null);
         toast({
           title: "Enhanced Analysis Unavailable",
@@ -438,6 +440,7 @@ export function TradingDashboard() {
       }
 
       setRecommendation(analysis.recommendation);
+      setConfidenceScoring(analysis.confidence);
 
       // Store the input data that was sent to AI
       setAnalysisInputData({
@@ -464,6 +467,7 @@ export function TradingDashboard() {
       // Check if it's an AI-specific error
       if (error.message?.includes('AI analysis unavailable')) {
         setRecommendation(null);
+        setConfidenceScoring(null);
         setAnalysisInputData(null);
         toast({
           title: "AI Analysis Unavailable",
@@ -596,6 +600,7 @@ export function TradingDashboard() {
       setHistoricalData(api_response.historicalData);
       setHistorical4hData(api_response.historical4hData || []);
       setRecommendation(ai_analysis.recommendation);
+      setConfidenceScoring(ai_analysis.confidence);
       setAnalysisInputData({
         symbol: savedAnalysis.symbol,
         currentData: api_response.currentData,
@@ -797,7 +802,16 @@ export function TradingDashboard() {
                             
                             <div className="text-sm flex-1 min-w-0">
                               <p className="font-medium truncate">
-                                {analysis.ai_analysis.recommendation.action} - {analysis.ai_analysis.recommendation.confidence}% confidence
+                                {analysis.ai_analysis.recommendation.action} - {
+                                  analysis.ai_analysis.confidence?.combined 
+                                    ? `${Math.round(analysis.ai_analysis.confidence.combined * 100)}%` 
+                                    : `${analysis.ai_analysis.recommendation.confidence}%`
+                                } confidence
+                                {analysis.ai_analysis.confidence?.p_fill && (
+                                  <span className="text-xs ml-1">
+                                    (Fill: {Math.round(analysis.ai_analysis.confidence.p_fill * 100)}%)
+                                  </span>
+                                )}
                               </p>
                               <p className="text-muted-foreground text-xs">
                                 {new Date(analysis.created_at).toLocaleString()}
@@ -1171,7 +1185,16 @@ export function TradingDashboard() {
                   {recommendation.action}
                 </Badge>
                 <div className="text-sm text-muted-foreground">
-                  Confidence: <span className="font-semibold">{recommendation.confidence}%</span>
+                  Confidence: <span className="font-semibold">
+                    {confidenceScoring?.combined 
+                      ? `${Math.round(confidenceScoring.combined * 100)}%` 
+                      : `${recommendation.confidence}%`}
+                  </span>
+                  {confidenceScoring?.p_fill && (
+                    <span className="ml-2 text-xs">
+                      (Fill: {Math.round(confidenceScoring.p_fill * 100)}%)
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   Risk/Reward: <span className="font-semibold">1:{recommendation.riskReward.toFixed(2)}</span>
