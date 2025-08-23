@@ -235,6 +235,12 @@ Respond with ONLY this JSON structure:
     recommendation.algorithmicStrategy = algorithmicSuggestion.strategy;
     recommendation.algorithmicPositionSize = algorithmicSuggestion.positionSize;
     recommendation.aiProvider = aiProvider;
+    
+    // Include fundamentals bias data if available
+    if (fundBias) {
+      recommendation.fundamentalsBias = fundBias;
+    }
+    
     console.log(`${aiProvider.toUpperCase()} analysis completed successfully`);
     return recommendation;
   } catch (parseError) {

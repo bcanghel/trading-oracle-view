@@ -105,19 +105,28 @@ serve(async (req) => {
       }
     }
 
+    // Include fundamentals analysis in response if available
+    const response: any = {
+      recommendation,
+      technicalAnalysis: { 
+        ...calculateTechnicalIndicators(historicalData),
+        enhancedFeatures 
+      },
+      trendAnalysis: analyzeTrend(historicalData),
+      marketSession: getMarketSession((new Date().getUTCHours() + 2) % 24),
+      enhancedFeatures,
+      strategy,
+      success: true,
+    };
+
+    // Add fundamentals data if it was processed
+    if (fundamentals) {
+      response.fundamentalsInput = fundamentals;
+      response.fundamentalsBias = recommendation.fundamentalsBias || null;
+    }
+
     return new Response(
-      JSON.stringify({
-        recommendation,
-        technicalAnalysis: { 
-          ...calculateTechnicalIndicators(historicalData),
-          enhancedFeatures 
-        },
-        trendAnalysis: analyzeTrend(historicalData),
-        marketSession: getMarketSession((new Date().getUTCHours() + 2) % 24),
-        enhancedFeatures,
-        strategy,
-        success: true,
-      }),
+      JSON.stringify(response),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
