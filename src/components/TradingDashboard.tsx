@@ -1259,6 +1259,20 @@ export function TradingDashboard() {
               <div>
                 <h4 className="font-semibold mb-2">Analysis Reasoning</h4>
                 <p className="text-muted-foreground leading-relaxed">{recommendation.reasoning}</p>
+
+                {recommendation.fundamentalsBias && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Fundamentals Impact</p>
+                    <div className="bg-muted/50 p-3 rounded-lg border-l-4 border-primary">
+                      <p className="text-sm leading-relaxed">{recommendation.fundamentalsBias.summary}</p>
+                      {recommendation.fundamentalsBias.keyEvents?.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Key events: {recommendation.fundamentalsBias.keyEvents.slice(0, 3).join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Enhanced Entry Conditions Section */}
