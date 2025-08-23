@@ -30,8 +30,18 @@ export async function analyzeWithAI(
   const fundamentals = validation?.ok ? validation.cleaned : undefined;
   const fundBias = fundamentals ? computeFundamentalBias(fundamentals) : null;
 
+  // Provider selection based on environment variable
+  const aiProvider = Deno.env.get('AI_PROVIDER') || 'openai'; // Default to OpenAI
   const openAIApiKey = Deno.env.get('OPEN_AI_API');
-  if (!openAIApiKey) throw new Error('OpenAI API key not configured');
+  const anthropicApiKey = Deno.env.get('ANTHROPIC_API');
+  
+  console.log(`Using AI Provider: ${aiProvider.toUpperCase()}`);
+  
+  if (aiProvider === 'claude' && !anthropicApiKey) {
+    throw new Error('Anthropic API key not configured but Claude provider selected');
+  } else if (aiProvider === 'openai' && !openAIApiKey) {
+    throw new Error('OpenAI API key not configured but OpenAI provider selected');
+  }
 
   const multiTimeframeContext = strategy === '1H+4H' && technicalAnalysis.multiTimeframe ? `
 ## MULTI-TIMEFRAME ANALYSIS (1H + 4H Strategy)
@@ -158,30 +168,64 @@ Respond with ONLY this JSON structure:
 - Reference multiple timeframes if using 1H+4H strategy
 - Justify strategic limit order approach over market execution`;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4.1-2025-04-14',
-      messages: [
-        { role: 'system', content: 'You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.' },
-        { role: 'user', content: analysisPrompt }
-      ],
-      max_completion_tokens: 2000,
-      response_format: { type: "json_object" },
-    }),
-  });
+  let response;
+  
+  if (aiProvider === 'claude') {
+    console.log('Making request to Claude Opus 4.1...');
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicApiKey!,
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-20250514',
+        max_tokens: 2000,
+        messages: [
+          { 
+            role: 'user', 
+            content: `You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.\n\n${analysisPrompt}` 
+          }
+        ]
+      }),
+    });
+  } else {
+    console.log('Making request to GPT-4.1...');
+    response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4.1-2025-04-14',
+        messages: [
+          { role: 'system', content: 'You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.' },
+          { role: 'user', content: analysisPrompt }
+        ],
+        max_completion_tokens: 2000,
+        response_format: { type: "json_object" },
+      }),
+    });
+  }
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`OpenAI API error: ${response.statusText} - ${errorBody}`);
+    console.error(`${aiProvider.toUpperCase()} API Error:`, errorBody);
+    throw new Error(`${aiProvider.toUpperCase()} API error: ${response.statusText} - ${errorBody}`);
   }
 
   const aiResponse = await response.json();
-  const analysisText = aiResponse.choices[0].message.content;
+  let analysisText: string;
+  
+  if (aiProvider === 'claude') {
+    analysisText = aiResponse.content[0].text;
+    console.log('Claude response tokens used:', aiResponse.usage);
+  } else {
+    analysisText = aiResponse.choices[0].message.content;
+    console.log('OpenAI response tokens used:', aiResponse.usage);
+  }
   
   try {
     const recommendation = JSON.parse(analysisText.trim());
@@ -190,10 +234,12 @@ Respond with ONLY this JSON structure:
     }
     recommendation.algorithmicStrategy = algorithmicSuggestion.strategy;
     recommendation.algorithmicPositionSize = algorithmicSuggestion.positionSize;
+    recommendation.aiProvider = aiProvider;
+    console.log(`${aiProvider.toUpperCase()} analysis completed successfully`);
     return recommendation;
   } catch (parseError) {
-    console.error('AI analysis parsing failed:', parseError.message);
-    console.error('Raw AI Response:', analysisText);
-    throw new Error('AI analysis result was not valid JSON.');
+    console.error(`${aiProvider.toUpperCase()} analysis parsing failed:`, parseError.message);
+    console.error(`Raw ${aiProvider.toUpperCase()} Response:`, analysisText);
+    throw new Error(`${aiProvider.toUpperCase()} analysis result was not valid JSON.`);
   }
 }

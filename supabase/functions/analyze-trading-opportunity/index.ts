@@ -37,7 +37,7 @@ serve(async (req) => {
     let recommendation;
     const { generateDeterministicSignal } = await import('./deterministic-engine.ts');
     
-    if (useDeterministic || !Deno.env.get('OPEN_AI_API')) {
+    if (useDeterministic || (!Deno.env.get('OPEN_AI_API') && !Deno.env.get('ANTHROPIC_API'))) {
       recommendation = generateDeterministicSignal(
         symbol,
         { historicalData, currentData, historical4hData },
