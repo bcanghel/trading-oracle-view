@@ -122,17 +122,18 @@ ${fundBias ? `**USD FUNDAMENTALS ANALYSIS:**
 6. **SUPPORT/RESISTANCE RETESTS**: Enter on retests of broken levels
 7. **CURRENT PRICE**: ONLY if immediate breakout momentum or no better levels available
 
-**STOP LOSS & TAKE PROFIT RULES (Flexible, Not Fixed):**
+**STOP LOSS & TAKE PROFIT RULES (R:R targeting):**
 - Anchor SL just beyond the logical invalidation level: for BUY below nearest swing low or SR zone edge; for SELL above nearest swing high or SR zone edge; add buffer ≥ 0.2×ATR.
-- Do NOT default to 50 pips. Typical SL range is 30–50 pips on majors, but smaller is allowed if protected by structure and still achieves ≥ 2:1 R:R.
-- Breakouts: place SL beyond the breakout level with ≥ 0.2×ATR buffer. Retests/pullbacks: SL beyond the retested level.
-- TP must be ≥ 2 × risk (in pips) and preferably at the next major S/R; avoid unrealistic targets far beyond structure/ADR.
+- Do NOT default to 50 pips. Typical SL range is 30–50 pips on majors, but smaller is allowed if protected by structure.
+- Take Profit should target R:R between 1.75 and 2.25 whenever structure allows; never exceed 2.5× risk and avoid < 1.5× unless no valid structure.
+- Prefer TP at next major S/R, pivot, or Fibonacci level (38.2/50/61.8) that fits the target range; adjust to the closest qualifying level.
+- Breakouts: SL beyond breakout with ≥ 0.2×ATR buffer; Trend/Pullbacks: SL beyond retested level.
 - Sanity: |entry − current price| ≤ 2.5×ATR unless a confirmed breakout justifies otherwise.
 - Precision: Round entry/SL/TP/support/resistance to realistic instrument precision (e.g., 5 decimals for non-JPY, 3 for JPY).
 
 **EXPERT ANALYSIS FRAMEWORK:**
 1. **Technical Confluence:** Identify 3+ confirming signals from different indicator categories
-2. **Risk Management:** Ensure R:R ratio ≥ 2:1, position at logical S/R levels
+2. **Risk Management:** Target R:R 1.75–2.25 using structure-based TP; allow 1.5–2.5 bounds, never exceed 2.5
 3. **Timing Precision:** Consider session volatility, news events, and momentum shifts
 4. **Entry Strategy:** PRIORITIZE strategic levels over current price for limit orders
 5. **Market Structure:** Use major S/R levels for entry, stop loss, and take profit placement
@@ -149,11 +150,11 @@ Respond with ONLY this JSON structure:
   "confidence": "integer 20-95 based on technical confluence and market conditions",
   "entry": "number - STRATEGIC entry price (prefer pullback/retracement levels over current price ${currentData.currentPrice})",
   "stopLoss": "number - logical stop beyond key level",
-  "takeProfit": "number - target at next major S/R or 2+ R:R",
+  "takeProfit": "number - target at next major S/R; aim R:R 1.75–2.25, never exceed 2.5 (min 1.5)",
   "support": "number - most critical support you identify",
   "resistance": "number - most critical resistance you identify",
   "reasoning": "detailed explanation referencing specific technical confluences and WHY you chose this entry level",
-  "riskReward": "number - calculated R:R ratio (minimum 2.0)",
+  "riskReward": "number - R:R in [1.5,2.5]; prefer 1.75–2.25",
   "entryConditions": "specific trigger conditions for entry (candlestick patterns, level breaks, etc.)",
   "entryTiming": "session-specific timing guidance and liquidity considerations",
   "volumeConfirmation": "volume requirements and signals to confirm entry",
@@ -163,7 +164,7 @@ Respond with ONLY this JSON structure:
 **CRITICAL REQUIREMENTS:**
 - **ENTRY MUST BE STRATEGIC**: Choose pullback/retracement/technical levels, NOT current price (${currentData.currentPrice}) unless justified breakout
 - Must explain WHY this entry level is better than current market price
-- Risk/reward must be ≥ 2:1
+- Risk/reward must be within 1.5–2.5; prefer 1.75–2.25; never exceed 2.5
 - Consider session timing and volatility in your analysis
 - Reference multiple timeframes if using 1H+4H strategy
 - Justify strategic limit order approach over market execution`;

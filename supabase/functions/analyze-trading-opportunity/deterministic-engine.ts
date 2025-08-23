@@ -110,15 +110,50 @@ export function generateDeterministicSignal(
     return null;
   }
   
-  const { action, entry, stopLoss, takeProfit, support, resistance } = 
+  const levels = 
     calculateLevels(strategy, direction, currentPrice, features, symbol);
+  let { action, entry, stopLoss, takeProfit, support, resistance } = levels;
   
-  // === RISK/REWARD VALIDATION ===
-  const riskReward = Math.abs(takeProfit - entry) / Math.abs(entry - stopLoss);
-  if (riskReward < 1.8) {
-    reasoning.push(`Insufficient R/R: ${riskReward.toFixed(2)}, required: 1.8+`);
-    return null;
+  // === R:R TARGETING AND TP ADJUSTMENT ===
+  const risk = Math.abs(entry - stopLoss) || 1e-6;
+  const isLong = action === 'BUY';
+
+  const chooseTargetRR = () => {
+    let target = 2.0; // baseline
+    if (strategy === 'MEANREV' || features.inSRZone || (features.distanceToSRZone <= 0.1 * (features.atr14 || 1))) target = 1.75;
+    if (strategy === 'BREAKOUT' && features.squeeze) target = 2.25;
+    if (strategy === 'TREND' && Math.abs(features.bias4h) > 0.5 && features.confluenceScore >= 65 && features.adrUsedToday < 80) target = 2.25;
+    return target;
+  };
+
+  const MAX_RR = 2.5;
+  const MIN_RR = 1.5;
+  let desiredRR = Math.min(MAX_RR, Math.max(MIN_RR, chooseTargetRR()));
+
+  // RR-based TP
+  let tpByRR = isLong ? entry + risk * desiredRR : entry - risk * desiredRR;
+
+  // Respect nearest S/R if it caps the move
+  if (isLong && Number.isFinite(resistance) && resistance > entry) {
+    tpByRR = Math.min(tpByRR, resistance);
+  } else if (!isLong && Number.isFinite(support) && support < entry) {
+    tpByRR = Math.max(tpByRR, support);
   }
+
+  takeProfit = tpByRR;
+
+  // Final clamp to bounds
+  let riskReward = Math.abs(takeProfit - entry) / risk;
+  if (riskReward > MAX_RR) {
+    takeProfit = isLong ? entry + risk * MAX_RR : entry - risk * MAX_RR;
+    riskReward = MAX_RR;
+  } else if (riskReward < MIN_RR) {
+    takeProfit = isLong ? entry + risk * MIN_RR : entry - risk * MIN_RR;
+    riskReward = MIN_RR;
+  }
+
+  reasoning.push(`Target R/R adjusted to ${riskReward.toFixed(2)} within [${MIN_RR}, ${MAX_RR}] using ${strategy} + S/R alignment`);
+
   
   // === CONFIDENCE CALCULATION ===
   let confidence = 50; // Base
