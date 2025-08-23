@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { symbol, historicalData, currentData, historical4hData = null, historical1dData = null, strategy = '1H', useDeterministic = false, fundamentals = null } = await req.json();
+    const { symbol, historicalData, currentData, historical4hData = null, historical1dData = null, strategy = '1H', useDeterministic = false, fundamentals = null, aiProvider = 'claude' } = await req.json();
 
     // Enhanced analysis with new features
     const sessionContext = currentData.sessionContext || {};
@@ -60,7 +60,10 @@ serve(async (req) => {
         );
       }
     } else {
-      // Fallback to AI analysis with enhanced features
+      // Use AI analysis with selected provider
+      // Set AI_PROVIDER environment variable for the ai-analysis function
+      Deno.env.set('AI_PROVIDER', aiProvider);
+      
       const { analyzeWithAI } = await import('./ai-analysis.ts');
       
       try {

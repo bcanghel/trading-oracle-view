@@ -31,6 +31,7 @@ interface TradingRecommendation {
   entryTiming?: string;
   volumeConfirmation?: string;
   candlestickSignals?: string;
+  aiProvider?: 'claude' | 'openai';
 }
 
 interface MarketData {
@@ -81,6 +82,7 @@ export function TradingDashboard() {
   const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
   const [showSavedAnalyses, setShowSavedAnalyses] = useState(false);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [aiProvider, setAiProvider] = useState<'claude' | 'openai' | 'deterministic'>('claude');
 
   // Session helper functions
   const getRomaniaHour = (date: Date = new Date()) => {
@@ -412,14 +414,14 @@ export function TradingDashboard() {
       setHistorical4hData(data.historical4hData || []);
       setCurrentStrategy(data.strategy || selectedStrategy);
 
-      // Get enhanced analysis (same as auto-trading but with limit order suggestions)
+      // Get enhanced analysis with selected AI provider
       const analysis = await analyzeTradingOpportunity(
         selectedPair,
         data.historicalData,
         data.currentData,
         data.historical4hData,
         selectedStrategy,
-         { useDeterministic: false, historical1dData: data.historical1dData }
+         { useDeterministic: aiProvider === 'deterministic', historical1dData: data.historical1dData, aiProvider: aiProvider !== 'deterministic' ? aiProvider : undefined }
       );
 
       // Check if analysis failed
@@ -694,7 +696,35 @@ export function TradingDashboard() {
                       </SelectContent>
                     </Select>
                    </div>
-                   <div className="col-span-1 sm:col-span-2 lg:col-span-1 space-y-2 lg:space-y-0">
+                   <div className="space-y-2">
+                     <label className="text-sm font-medium block">AI Analysis Provider</label>
+                     <Select value={aiProvider} onValueChange={(value: 'claude' | 'openai' | 'deterministic') => setAiProvider(value)}>
+                       <SelectTrigger className="h-10">
+                         <SelectValue />
+                       </SelectTrigger>
+                       <SelectContent className="z-50">
+                         <SelectItem value="claude">
+                           <div className="flex items-center gap-2">
+                             <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                             Claude Opus 4.1 (Default)
+                           </div>
+                         </SelectItem>
+                         <SelectItem value="openai">
+                           <div className="flex items-center gap-2">
+                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                             GPT-4.1
+                           </div>
+                         </SelectItem>
+                         <SelectItem value="deterministic">
+                           <div className="flex items-center gap-2">
+                             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                             Deterministic Engine
+                           </div>
+                         </SelectItem>
+                       </SelectContent>
+                     </Select>
+                   </div>
+                    <div className="col-span-1 sm:col-span-2 lg:col-span-1 space-y-2 lg:space-y-0">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
                       <Button 
                         onClick={analyzeMarket} 
@@ -1106,12 +1136,25 @@ export function TradingDashboard() {
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5" />
                 AI Trading Recommendation
-                <Badge 
-                  variant={currentStrategy === '1H+4H' ? 'default' : 'secondary'} 
-                  className="ml-auto"
-                >
-                  {currentStrategy} Strategy
-                </Badge>
+                <div className="ml-auto flex items-center gap-2">
+                  {recommendation.aiProvider && (
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        recommendation.aiProvider === 'claude' 
+                          ? 'border-purple-500 text-purple-700 dark:text-purple-300' 
+                          : 'border-green-500 text-green-700 dark:text-green-300'
+                      }`}
+                    >
+                      {recommendation.aiProvider === 'claude' ? 'Claude Opus 4.1' : 'GPT-4.1'}
+                    </Badge>
+                  )}
+                  <Badge 
+                    variant={currentStrategy === '1H+4H' ? 'default' : 'secondary'} 
+                  >
+                    {currentStrategy} Strategy
+                  </Badge>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
