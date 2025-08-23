@@ -30,28 +30,29 @@ export function generateDeterministicSignal(
   
   // === HARD PRE-GATES ===
   const reasoning: string[] = [];
+  let gated = false; // if any gate triggers, we still produce a safe low-confidence signal
   
-  // Weekend/Holiday gate
+  // Weekend/Holiday gate (soft)
   if (sessionContext.isWeekendOrHoliday) {
     reasoning.push("Market closed: Weekend/Holiday period");
-    return null;
+    gated = true;
   }
   
-  // EOD gate (120 minutes before close)
+  // EOD gate (120 minutes before close) - soften to warning
   if (sessionContext.minutesToEOD < 120) {
     reasoning.push(`Too close to EOD: ${sessionContext.minutesToEOD} minutes remaining`);
-    return null;
+    gated = true;
   }
   
-  // Spread/Activity gates
+  // Spread/Activity gates - soften to penalties rather than hard stops
   if (features.spreadZ > 2.0) {
     reasoning.push(`High spread: Z-score ${features.spreadZ.toFixed(2)}`);
-    return null;
+    gated = true;
   }
   
   if (features.activityScore < -1.0) {
     reasoning.push(`Low activity: Score ${features.activityScore.toFixed(2)}`);
-    return null;
+    gated = true;
   }
   
   // === STRATEGY SELECTION ===
@@ -100,6 +101,68 @@ export function generateDeterministicSignal(
     reasoning.push("No valid setup detected");
     reasoning.push(`Confluence: ${features.confluenceScore}, Squeeze: ${features.squeeze}`);
     reasoning.push(`ADR used: ${features.adrUsedToday.toFixed(1)}%`);
+    
+    if (gated) {
+      // Build a safe, low-confidence placeholder signal instead of failing hard
+      const biasLong = (features.bias4h ?? 0) >= 0 || features.ema20Slope > 0;
+      const action: 'BUY' | 'SELL' = biasLong ? 'BUY' : 'SELL';
+      const atr = features.atr14 || 0.0001;
+      const entry = currentPrice;
+      const stopLoss = biasLong ? entry - 0.8 * atr : entry + 0.8 * atr;
+      const risk = Math.abs(entry - stopLoss) || 1e-6;
+      const desiredRR = 1.5;
+      let takeProfit = biasLong ? entry + risk * desiredRR : entry - risk * desiredRR;
+
+      // Nearest S/R
+      let support = currentPrice;
+      let resistance = currentPrice;
+      const supportZones = features.srZones.filter(z => z.type === 'support' && z.max < currentPrice);
+      const resistanceZones = features.srZones.filter(z => z.type === 'resistance' && z.min > currentPrice);
+      if (supportZones.length > 0) {
+        support = supportZones.reduce((nearest, zone) => Math.abs(zone.max - currentPrice) < Math.abs(nearest - currentPrice) ? zone.max : nearest, supportZones[0].max);
+      }
+      if (resistanceZones.length > 0) {
+        resistance = resistanceZones.reduce((nearest, zone) => Math.abs(zone.min - currentPrice) < Math.abs(nearest - currentPrice) ? zone.min : nearest, resistanceZones[0].min);
+      }
+
+      let riskReward = Math.abs(takeProfit - entry) / risk;
+      if (!Number.isFinite(riskReward) || riskReward < 1.5) {
+        takeProfit = biasLong ? entry + risk * 1.5 : entry - risk * 1.5;
+        riskReward = 1.5;
+      }
+      if (riskReward > 2.5) {
+        takeProfit = biasLong ? entry + risk * 2.5 : entry - risk * 2.5;
+        riskReward = 2.5;
+      }
+
+      let confidence = 25;
+      if (sessionContext.isWeekendOrHoliday) confidence -= 5;
+      if (sessionContext.minutesToEOD < 120) confidence -= 5;
+      if (features.activityScore < -1.0) confidence -= 5;
+      if (features.spreadZ > 2.0) confidence -= 5;
+      confidence = Math.max(20, Math.min(35, confidence));
+
+      reasoning.push('Fallback: Low-confidence placeholder due to market conditions (no auto-execution).');
+
+      return {
+        action,
+        confidence,
+        entry,
+        stopLoss,
+        takeProfit,
+        support,
+        resistance,
+        reasoning,
+        riskReward,
+        entryConditions: 'Avoid entries until normal market conditions resume; use this only for planning.',
+        entryTiming: generateEntryTiming('TREND', sessionContext),
+        volumeConfirmation: 'Wait for activity to normalize; volume currently insufficient',
+        candlestickSignals: 'Do not act solely on this placeholder signal',
+        algorithmicStrategy: 'NONE',
+        algorithmicPositionSize: 0,
+      };
+    }
+
     return null;
   }
   
