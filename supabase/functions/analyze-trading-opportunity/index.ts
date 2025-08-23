@@ -61,9 +61,6 @@ serve(async (req) => {
       }
     } else {
       // Use AI analysis with selected provider
-      // Set AI_PROVIDER environment variable for the ai-analysis function
-      Deno.env.set('AI_PROVIDER', aiProvider);
-      
       const { analyzeWithAI } = await import('./ai-analysis.ts');
       
       try {
@@ -77,7 +74,8 @@ serve(async (req) => {
           new Date(),
           strategy,
           historical4hData,
-          fundamentals
+          fundamentals,
+          aiProvider
         );
       } catch (aiError) {
         console.log('AI analysis failed, using deterministic fallback:', aiError.message);

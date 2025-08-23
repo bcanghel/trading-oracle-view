@@ -12,7 +12,8 @@ export async function analyzeWithAI(
   romaniaTime: Date,
   strategy: string = '1H',
   historical4hData: any[] | null = null,
-  fundamentalsRaw?: any
+  fundamentalsRaw?: any,
+  aiProvider: 'claude' | 'openai' = 'claude'
 ) {
   const algorithmicSuggestion = calculateEntrySignal({
     currentPrice: currentData.currentPrice,
@@ -30,8 +31,7 @@ export async function analyzeWithAI(
   const fundamentals = validation?.ok ? validation.cleaned : undefined;
   const fundBias = fundamentals ? computeFundamentalBias(fundamentals) : null;
 
-  // Provider selection based on environment variable
-  const aiProvider = Deno.env.get('AI_PROVIDER') || 'openai'; // Default to OpenAI
+  // Provider selection based on parameter (not environment variable)
   const openAIApiKey = Deno.env.get('OPEN_AI_API');
   const anthropicApiKey = Deno.env.get('ANTHROPIC_API');
   
