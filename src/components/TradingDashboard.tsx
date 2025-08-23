@@ -32,6 +32,7 @@ interface TradingRecommendation {
   volumeConfirmation?: string;
   candlestickSignals?: string;
   aiProvider?: 'claude' | 'openai';
+  aiModel?: string;
 }
 
 interface MarketData {
@@ -1146,7 +1147,7 @@ export function TradingDashboard() {
                           : 'border-green-500 text-green-700 dark:text-green-300'
                       }`}
                     >
-                      {recommendation.aiProvider === 'claude' ? 'Claude Opus 4.1' : 'GPT-5'}
+                      {recommendation.aiProvider === 'claude' ? 'Claude Opus 4.1' : (recommendation.aiModel === 'gpt-4.1-2025-04-14' ? 'GPT-4.1' : 'GPT-5')}
                     </Badge>
                   )}
                   <Badge 
