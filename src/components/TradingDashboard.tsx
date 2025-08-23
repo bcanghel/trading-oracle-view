@@ -33,7 +33,7 @@ interface TradingRecommendation {
   candlestickSignals?: string;
   aiProvider?: 'claude' | 'openai';
   aiModel?: string;
-  fundamentalBias?: {
+  fundamentalsBias?: {
     overallBias: "BULLISH" | "BEARISH" | "NEUTRAL";
     strength: number;
     summary: string;
@@ -818,7 +818,7 @@ export function TradingDashboard() {
                                     (Fill: {Math.round(analysis.ai_analysis.confidence.p_fill * 100)}%)
                                   </span>
                                 )}
-                                {analysis.ai_analysis.recommendation.fundamentalBias && (
+                                {analysis.ai_analysis.recommendation.fundamentalsBias && (
                                   <Badge variant="outline" className="text-xs ml-1 px-1">
                                     📊 Fund
                                   </Badge>
@@ -1207,15 +1207,15 @@ export function TradingDashboard() {
                     </span>
                   )}
                 </div>
-                {recommendation.fundamentalBias && (
+                {recommendation.fundamentalsBias && (
                   <div className="text-xs text-muted-foreground mt-1">
                     <Badge variant="outline" className="text-xs px-2 py-0.5">
-                      📊 Fundamentals: {recommendation.fundamentalBias.overallBias} 
-                      ({recommendation.fundamentalBias.strength}/100)
+                      📊 Fundamentals: {recommendation.fundamentalsBias.overallBias} 
+                      ({recommendation.fundamentalsBias.strength}/100)
                     </Badge>
-                    {recommendation.fundamentalBias.keyEvents?.length > 0 && (
+                    {recommendation.fundamentalsBias.keyEvents?.length > 0 && (
                       <span className="ml-2">
-                        Key: {recommendation.fundamentalBias.keyEvents.slice(0, 2).join(", ")}
+                        Key: {recommendation.fundamentalsBias.keyEvents.slice(0, 2).join(", ")}
                       </span>
                     )}
                   </div>
