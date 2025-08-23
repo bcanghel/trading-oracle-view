@@ -198,7 +198,7 @@ Respond with ONLY this JSON structure:
       }),
     });
   } else {
-    console.log('Making request to GPT-4.1...');
+    console.log('Making request to GPT-5...');
     response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -206,7 +206,7 @@ Respond with ONLY this JSON structure:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-5-2025-08-07',
         messages: [
           { role: 'system', content: 'You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.' },
           { role: 'user', content: analysisPrompt }
