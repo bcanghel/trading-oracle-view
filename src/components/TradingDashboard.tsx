@@ -713,7 +713,7 @@ export function TradingDashboard() {
                          <SelectItem value="openai">
                            <div className="flex items-center gap-2">
                              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                              GPT-5
+                              GPT-4.1
                            </div>
                          </SelectItem>
                          <SelectItem value="deterministic">

@@ -199,40 +199,25 @@ Respond with ONLY this JSON structure:
       }),
     });
   } else {
-    console.log('Making request to GPT-5...');
-    const endpoint = 'https://api.openai.com/v1/chat/completions';
-    const headers = {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    };
-    const baseMessages = [
-      { role: 'system', content: 'You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.' },
-      { role: 'user', content: analysisPrompt }
-    ];
-    let model = 'gpt-5-2025-08-07';
-    aiModelUsed = model;
-    const payload = (m: string) => ({
-      model: m,
-      messages: baseMessages,
-      max_completion_tokens: 2000,
-      response_format: { type: "json_object" },
+    console.log('Making request to GPT-4.1...');
+    aiModelUsed = 'gpt-4.1-2025-04-14';
+    
+    response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4.1-2025-04-14',
+        messages: [
+          { role: 'system', content: 'You are an expert forex trading analyst with 15+ years of institutional trading experience. You MUST respond with ONLY valid JSON format. No explanatory text before or after. Start with { and end with }.' },
+          { role: 'user', content: analysisPrompt }
+        ],
+        max_completion_tokens: 2000,
+        response_format: { type: "json_object" },
+      }),
     });
-
-    response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload(model)) });
-
-    if (!response.ok) {
-      const primaryBody = await response.text();
-      console.error('OPENAI API Error (primary):', primaryBody);
-      const shouldFallback = response.status === 404 || primaryBody.includes('model_not_found') || primaryBody.includes('must be verified') || primaryBody.includes('`gpt-5');
-      if (shouldFallback) {
-        console.warn('Falling back to GPT-4.1 due to model access error...');
-        model = 'gpt-4.1-2025-04-14';
-        aiModelUsed = model;
-        response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(payload(model)) });
-      } else {
-        throw new Error(`OPENAI API error: ${response.statusText} - ${primaryBody}`);
-      }
-    }
   }
 
   if (!response.ok) {
@@ -260,7 +245,7 @@ Respond with ONLY this JSON structure:
     recommendation.algorithmicStrategy = algorithmicSuggestion.strategy;
     recommendation.algorithmicPositionSize = algorithmicSuggestion.positionSize;
     recommendation.aiProvider = aiProvider;
-    recommendation.aiModel = aiModelUsed || (aiProvider === 'claude' ? 'claude-opus-4-20250514' : 'gpt-5-2025-08-07');
+    recommendation.aiModel = aiModelUsed || (aiProvider === 'claude' ? 'claude-opus-4-20250514' : 'gpt-4.1-2025-04-14');
     
     // Include fundamentals bias data if available
     if (fundBias) {
