@@ -132,12 +132,15 @@ export function computeFundamentalBias(fundamentals: FundamentalsInput): Fundame
 
   // Adjust bias direction based on pair structure
   let finalBias = overallBias;
+  let biasDescription = "USD fundamentals";
+  
   if (quoteCcy === "USD" && overallBias !== "NEUTRAL") {
     // For XXX/USD pairs, USD strength means pair goes down
     finalBias = overallBias === "BULLISH" ? "BEARISH" : "BULLISH";
+    biasDescription = `${baseCcy}/${quoteCcy} fundamentals (via USD)`;
   }
 
-  const summary = `USD fundamentals show ${overallBias.toLowerCase()} bias (${Math.round(strength)}% strength) based on ${usdReleases.length} recent events. ${keyEvents.length > 0 ? "Key drivers: " + keyEvents.slice(0, 3).join(", ") : ""}`;
+  const summary = `${biasDescription} show ${finalBias.toLowerCase()} bias (${Math.round(strength)}% strength) based on ${usdReleases.length} recent USD events. ${keyEvents.length > 0 ? "Key drivers: " + keyEvents.slice(0, 3).join(", ") : ""}`;
 
   return {
     overallBias: finalBias,
