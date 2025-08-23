@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { symbol, historicalData, currentData, historical4hData = null, historical1dData = null, strategy = '1H', useDeterministic = false } = await req.json();
+    const { symbol, historicalData, currentData, historical4hData = null, historical1dData = null, strategy = '1H', useDeterministic = false, fundamentals = null } = await req.json();
 
     // Enhanced analysis with new features
     const sessionContext = currentData.sessionContext || {};
@@ -73,7 +73,8 @@ serve(async (req) => {
           getMarketSession((new Date().getUTCHours() + 2) % 24),
           new Date(),
           strategy,
-          historical4hData
+          historical4hData,
+          fundamentals
         );
       } catch (aiError) {
         console.log('AI analysis failed, using deterministic fallback:', aiError.message);

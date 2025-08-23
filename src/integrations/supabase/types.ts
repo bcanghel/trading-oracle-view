@@ -235,6 +235,42 @@ export type Database = {
         }
         Relationships: []
       }
+      usd_fundamentals: {
+        Row: {
+          actual_value: number
+          created_at: string
+          event_date: string
+          event_type: string
+          forecast_value: number | null
+          id: string
+          previous_value: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actual_value: number
+          created_at?: string
+          event_date: string
+          event_type: string
+          forecast_value?: number | null
+          id?: string
+          previous_value?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actual_value?: number
+          created_at?: string
+          event_date?: string
+          event_type?: string
+          forecast_value?: number | null
+          id?: string
+          previous_value?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       public_auto_trades_stats: {

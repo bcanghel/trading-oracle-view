@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import UserMenu from "@/components/UserMenu";
 import { MarketSessions } from "@/components/MarketSessions";
 import { AutoTradingPanel } from "@/components/AutoTradingPanel";
+import USDFundamentals from "@/components/USDFundamentals";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
@@ -644,7 +645,7 @@ export function TradingDashboard() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="analysis" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-3 h-12 sm:h-10">
+          <TabsList className="grid w-full grid-cols-4 h-12 sm:h-10">
             <TabsTrigger value="analysis" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
               <BarChart3 className="h-4 w-4 flex-shrink-0" />
               <span className="hidden xs:inline sm:inline">Market Analysis</span>
@@ -654,6 +655,11 @@ export function TradingDashboard() {
               <Activity className="h-4 w-4 flex-shrink-0" />
               <span className="hidden xs:inline sm:inline">Auto Trading</span>
               <span className="xs:hidden sm:hidden">Auto</span>
+            </TabsTrigger>
+            <TabsTrigger value="usd-fundamentals" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+              <DollarSign className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden xs:inline sm:inline">USD Fundamentals</span>
+              <span className="xs:hidden sm:hidden">USD</span>
             </TabsTrigger>
             <TabsTrigger value="sessions" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
               <Clock className="h-4 w-4 flex-shrink-0" />
@@ -1339,6 +1345,10 @@ export function TradingDashboard() {
 
           <TabsContent value="auto-trading">
               <AutoTradingPanel />
+          </TabsContent>
+
+          <TabsContent value="usd-fundamentals">
+            <USDFundamentals />
           </TabsContent>
 
           <TabsContent value="sessions">

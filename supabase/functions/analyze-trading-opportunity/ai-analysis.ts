@@ -1,4 +1,6 @@
 import { calculateEntrySignal } from "./entry-logic.ts";
+import { validateFundamentals } from "./fundamentals-validate.ts";
+import { computeFundamentalBias } from "./fundamentals-bias.ts";
 
 export async function analyzeWithAI(
   symbol: string,
@@ -9,7 +11,8 @@ export async function analyzeWithAI(
   marketSession: any,
   romaniaTime: Date,
   strategy: string = '1H',
-  historical4hData: any[] | null = null
+  historical4hData: any[] | null = null,
+  fundamentalsRaw?: any
 ) {
   const algorithmicSuggestion = calculateEntrySignal({
     currentPrice: currentData.currentPrice,
@@ -18,6 +21,14 @@ export async function analyzeWithAI(
     marketSession,
     atr: technicalAnalysis.atr
   });
+
+  // Process fundamentals for USD pairs only
+  const validation = fundamentalsRaw ? validateFundamentals(fundamentalsRaw) : null;
+  if (validation && !validation.ok) {
+    console.warn("Fundamentals validation issues:", validation.issues);
+  }
+  const fundamentals = validation?.ok ? validation.cleaned : undefined;
+  const fundBias = fundamentals ? computeFundamentalBias(fundamentals) : null;
 
   const openAIApiKey = Deno.env.get('OPEN_AI_API');
   if (!openAIApiKey) throw new Error('OpenAI API key not configured');
@@ -83,6 +94,12 @@ ${enhancedJson}
 - Time: ${romaniaTime.toLocaleString('en-US', { timeZone: 'Europe/Bucharest', hour12: false })}
 - Session: ${marketSession.name} (${marketSession.status})
 - Volatility: ${marketSession.volatility} | Recommendation: ${marketSession.recommendation}
+
+${fundBias ? `**USD FUNDAMENTALS ANALYSIS:**
+- Overall Bias: ${fundBias.overallBias} (Strength: ${fundBias.strength}%)
+- Summary: ${fundBias.summary}
+- Key Events: ${fundBias.keyEvents.join(', ')}
+- **IMPORTANT**: Factor this fundamental bias into your technical analysis confidence and direction bias.` : ''}
 
 **CRITICAL ENTRY STRATEGY RULES:**
 🚨 **STRATEGIC ENTRY PRIORITY - DO NOT DEFAULT TO CURRENT PRICE**
