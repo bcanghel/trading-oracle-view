@@ -712,7 +712,7 @@ export function TradingDashboard() {
                          <SelectItem value="openai">
                            <div className="flex items-center gap-2">
                              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                             GPT-4.1
+                              GPT-5
                            </div>
                          </SelectItem>
                          <SelectItem value="deterministic">
@@ -1146,7 +1146,7 @@ export function TradingDashboard() {
                           : 'border-green-500 text-green-700 dark:text-green-300'
                       }`}
                     >
-                      {recommendation.aiProvider === 'claude' ? 'Claude Opus 4.1' : 'GPT-4.1'}
+                      {recommendation.aiProvider === 'claude' ? 'Claude Opus 4.1' : 'GPT-5'}
                     </Badge>
                   )}
                   <Badge 
