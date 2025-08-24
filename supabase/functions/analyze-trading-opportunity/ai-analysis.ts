@@ -111,7 +111,11 @@ ${fundBias ? `**USD FUNDAMENTALS ANALYSIS:**
 - Overall Bias: ${fundBias.overallBias} (Strength: ${fundBias.strength}%)
 - Summary: ${fundBias.summary}
 - Key Events: ${fundBias.keyEvents.join(', ')}
-- **IMPORTANT**: Factor this fundamental bias into your technical analysis confidence and direction bias.` : ''}
+- **IMPORTANT**: Factor this fundamental bias into your technical analysis confidence and direction bias.
+- **REASONING REQUIREMENT**: In the "reasoning" field, include a short subsection titled "Fundamentals Integration" that explicitly states:
+  - whether fundamentals align or conflict with the trade direction at the pair level (e.g., GBP/USD, not raw USD),
+  - how this influenced confidence or risk management (e.g., slight confidence reduction, preference for tighter SL/position size),
+  - mention 1–2 key drivers by name.` : ''}
 
 **CRITICAL ENTRY STRATEGY RULES:**
 🚨 **CRITICAL DECISION-MAKING PRIORITY**
@@ -262,13 +266,23 @@ Respond with ONLY this JSON structure:
     recommendation.aiProvider = aiProvider;
     recommendation.aiModel = aiModelUsed || (aiProvider === 'claude' ? 'claude-opus-4-20250514' : 'gpt-5-2025-08-07');
     
-    // Include fundamentals bias data if available
-    if (fundBias) {
-      recommendation.fundamentalsBias = fundBias;
-    }
-    
-    console.log(`${aiProvider.toUpperCase()} analysis completed successfully`);
-    return recommendation;
+// Include fundamentals bias data if available
+if (fundBias) {
+  recommendation.fundamentalsBias = fundBias;
+  // Ensure the reasoning explicitly mentions how fundamentals were considered
+  const reasonText = (String(recommendation.reasoning || '')).trim();
+  const mentionsFundamentals = /fundamental/i.test(reasonText);
+  if (!mentionsFundamentals) {
+    const action = String(recommendation.action || '').toUpperCase();
+    const aligns = (fundBias.overallBias === 'BULLISH' && action === 'BUY') || (fundBias.overallBias === 'BEARISH' && action === 'SELL');
+    const key = Array.isArray(fundBias.keyEvents) && fundBias.keyEvents.length > 0 ? ` (key: ${fundBias.keyEvents.slice(0,2).join(', ')})` : '';
+    const fundamentalsLine = `Fundamentals Integration: ${fundBias.summary}. This ${aligns ? 'aligns with' : 'conflicts with'} the ${action} setup${key}.`;
+    recommendation.reasoning = reasonText ? `${reasonText}\n\n${fundamentalsLine}` : fundamentalsLine;
+  }
+}
+
+console.log(`${aiProvider.toUpperCase()} analysis completed successfully`);
+return recommendation;
   } catch (parseError) {
     console.error(`${aiProvider.toUpperCase()} analysis parsing failed:`, parseError.message);
     console.error(`Raw ${aiProvider.toUpperCase()} Response:`, analysisText);
