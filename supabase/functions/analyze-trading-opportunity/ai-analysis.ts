@@ -279,6 +279,18 @@ if (fundBias) {
     const fundamentalsLine = `Fundamentals Integration: ${fundBias.summary}. This ${aligns ? 'aligns with' : 'conflicts with'} the ${action} setup${key}.`;
     recommendation.reasoning = reasonText ? `${reasonText}\n\n${fundamentalsLine}` : fundamentalsLine;
   }
+} else if (fundamentalsRaw) {
+  // Fundamentals were provided but did not pass validation → add neutral note
+  const neutralSummary = 'Fundamentals provided but no qualified USD releases matched supported events within 14 days; treated as neutral.';
+  recommendation.fundamentalsBias = {
+    overallBias: 'NEUTRAL',
+    strength: 0,
+    summary: neutralSummary,
+    keyEvents: []
+  };
+  const reasonText = (String(recommendation.reasoning || '')).trim();
+  const fundamentalsLine = `Fundamentals Integration: ${neutralSummary}`;
+  recommendation.reasoning = reasonText ? `${reasonText}\n\n${fundamentalsLine}` : fundamentalsLine;
 }
 
 console.log(`${aiProvider.toUpperCase()} analysis completed successfully`);

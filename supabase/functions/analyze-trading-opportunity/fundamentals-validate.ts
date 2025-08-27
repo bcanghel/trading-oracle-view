@@ -38,21 +38,46 @@ function toNumOrNull(v: unknown): number | null {
 }
 
 function normEventName(e: string): EconomicEvent | null {
-  // light normalization (trim, title case on known aliases)
-  const x = e.trim();
-  // simple aliases
-  if (/^core\s*cpi$/i.test(x)) return "Core CPI";
-  if (/^cpi$/i.test(x)) return "CPI";
+  const x = String(e ?? '').trim();
+
+  // Core CPI aliases first
+  if (/(^|\b)core\b.*(cpi|consumer\s*price|inflation)/i.test(x)) return "Core CPI";
+
+  // CPI aliases
+  if (/^(cpi)\b/i.test(x)) return "CPI";
+  if (/(consumer\s*price|inflation\s*rate|inflation)\b/i.test(x)) return "CPI";
+  if (/\bcpi\s*(m\/m|q\/q|y\/y)/i.test(x)) return "CPI";
+
+  // PCE aliases
   if (/^pce$/i.test(x)) return "PCE";
-  if (/^non[-\s]?farm/i.test(x)) return "NFP";
-  if (/^unemployment/i.test(x)) return "Unemployment";
-  if (/^claims/i.test(x) || /jobless/i.test(x)) return "Jobless Claims";
-  if (/^gdp$/i.test(x)) return "GDP";
-  if (/^pmi.*man/i.test(x) || /^ism.*man/i.test(x)) return "PMI Manufacturing";
-  if (/^pmi.*serv/i.test(x) || /^ism.*serv/i.test(x)) return "PMI Services";
-  if (/^retail/i.test(x)) return "Retail Sales";
-  if (/rate.*decision/i.test(x) || /^policy.*rate/i.test(x)) return "Rate Decision";
-  // exact matches already?
+  if (/(core\s*)?pce(\s*price\s*index)?/i.test(x)) return "PCE";
+  if (/personal\s*consumption\s*expenditures/i.test(x)) return "PCE";
+
+  // NFP aliases
+  if (/non[-\s]?farm.*payroll/i.test(x) || /\bNFP\b/i.test(x) || /payrolls/i.test(x)) return "NFP";
+
+  // Unemployment rate
+  if (/unemployment(\s*rate)?/i.test(x) || /jobless\s*rate/i.test(x)) return "Unemployment";
+
+  // Jobless claims
+  if (/((initial|continuing)\s*)?(jobless|unemployment)\s*claims/i.test(x) || /^claims$/i.test(x)) return "Jobless Claims";
+
+  // GDP
+  if (/^gdp\b/i.test(x) || /gross\s*domestic\s*product/i.test(x)) return "GDP";
+
+  // PMI Manufacturing
+  if (/((ism|s&p\s*global|markit).*)?manufacturing.*(pmi|index)/i.test(x) || /manufacturing\s*pmi/i.test(x)) return "PMI Manufacturing";
+
+  // PMI Services (incl. non-manufacturing)
+  if (/((ism|s&p\s*global|markit).*)?(services|non[-\s]?manufacturing).*(pmi|index)/i.test(x) || /services\s*pmi/i.test(x)) return "PMI Services";
+
+  // Retail Sales
+  if (/retail\s*sales/i.test(x)) return "Retail Sales";
+
+  // Rate Decision / Policy Rate
+  if (/rate.*decision/i.test(x) || /interest\s*rate\s*decision/i.test(x) || /\bfomc\b/i.test(x) || /federal\s*funds\s*rate/i.test(x) || /policy\s*rate/i.test(x) || /monetary\s*policy\s*decision/i.test(x) || /cash\s*rate/i.test(x) || /overnight\s*rate/i.test(x)) return "Rate Decision";
+
+  // exact matches
   if (ALLOWED_EVENTS.has(x as EconomicEvent)) return x as EconomicEvent;
   return null;
 }
