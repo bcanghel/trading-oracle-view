@@ -190,6 +190,7 @@ serve(async (req) => {
       trendAnalysis: analyzeTrend(historicalData),
       marketSession: getMarketSession((new Date().getUTCHours() + 2) % 24),
       enhancedFeatures,
+      entryPrecisionAnalysis: recommendation.entryPrecisionAnalysis || null, // Include entry precision data
       confidence: confidenceScoring,
       strategy,
       success: true,

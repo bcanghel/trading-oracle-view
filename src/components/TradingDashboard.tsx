@@ -33,6 +33,29 @@ interface TradingRecommendation {
   candlestickSignals?: string;
   aiProvider?: 'claude' | 'openai';
   aiModel?: string;
+  selectedOption?: string;
+  entryPrecisionAnalysis?: {
+    currentPrice: number;
+    consistencyScore: number;
+    buyOptions: Array<{
+      classification: string;
+      entryPrice: number;
+      distanceInPips: number;
+      confluence: number;
+      riskReward: number;
+      strength: number;
+      reasoning: string[];
+    }>;
+    sellOptions: Array<{
+      classification: string;
+      entryPrice: number;
+      distanceInPips: number;
+      confluence: number;
+      riskReward: number;
+      strength: number;
+      reasoning: string[];
+    }>;
+  };
   fundamentalsBias?: {
     overallBias: "BULLISH" | "BEARISH" | "NEUTRAL";
     strength: number;
@@ -1269,6 +1292,56 @@ export function TradingDashboard() {
                         <p className="text-xs text-muted-foreground mt-2">
                           Key events: {recommendation.fundamentalsBias.keyEvents.slice(0, 3).join(", ")}
                         </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Entry Precision Engine Analysis */}
+                {recommendation.entryPrecisionAnalysis && (
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-medium text-muted-foreground">Entry Precision Engine</p>
+                      <Badge 
+                        variant={
+                          recommendation.entryPrecisionAnalysis.consistencyScore >= 70 ? "default" : 
+                          recommendation.entryPrecisionAnalysis.consistencyScore >= 50 ? "secondary" : "outline"
+                        }
+                      >
+                        {recommendation.entryPrecisionAnalysis.consistencyScore}% Consistency
+                      </Badge>
+                    </div>
+                    
+                    <div className="bg-muted/30 p-3 rounded-lg border border-border/50">
+                      {recommendation.selectedOption && (
+                        <p className="text-sm font-medium text-foreground mb-2">
+                          Selected: {recommendation.selectedOption}
+                        </p>
+                      )}
+                      
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <p className="text-muted-foreground">Available BUY Options</p>
+                          <p className="font-medium">{recommendation.entryPrecisionAnalysis.buyOptions?.length || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Available SELL Options</p>
+                          <p className="font-medium">{recommendation.entryPrecisionAnalysis.sellOptions?.length || 0}</p>
+                        </div>
+                      </div>
+                      
+                      {recommendation.entryPrecisionAnalysis.consistencyScore >= 70 && (
+                        <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
+                          <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
+                          High precision - mathematically consistent levels
+                        </div>
+                      )}
+                      {recommendation.entryPrecisionAnalysis.consistencyScore < 50 && (
+                        <div className="mt-2 flex items-center gap-1 text-xs text-yellow-600">
+                          <AlertTriangle className="h-3 w-3" />
+                          Lower precision - increased uncertainty
+                        </div>
                       )}
                     </div>
                   </div>

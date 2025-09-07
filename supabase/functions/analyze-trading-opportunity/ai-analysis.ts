@@ -1,6 +1,7 @@
 import { calculateEntrySignal } from "./entry-logic.ts";
 import { validateFundamentals } from "./fundamentals-validate.ts";
 import { computeFundamentalBias } from "./fundamentals-bias.ts";
+import { calculateOptimalEntryLevels } from "./entry-precision-engine.ts";
 
 export async function analyzeWithAI(
   symbol: string,
@@ -22,6 +23,16 @@ export async function analyzeWithAI(
     marketSession,
     atr: technicalAnalysis.atr
   });
+
+  // Calculate precise entry levels using the Entry Precision Engine
+  const entryPrecisionAnalysis = calculateOptimalEntryLevels(
+    symbol,
+    currentData.currentPrice,
+    technicalAnalysis,
+    technicalAnalysis.enhancedFeatures || {},
+    marketSession,
+    technicalAnalysis.atr
+  );
 
   // Process fundamentals for USD pairs only
   const validation = fundamentalsRaw ? validateFundamentals(fundamentalsRaw) : null;
@@ -61,21 +72,54 @@ export async function analyzeWithAI(
   // Include enhanced features as compact JSON for the model to parse easily
   const enhancedJson = JSON.stringify(technicalAnalysis?.enhancedFeatures ?? {}, null, 2);
 
+  // Create structured entry options for the LLM
+  const buyOptionsText = entryPrecisionAnalysis.buyOptions.map((option, index) => 
+    `BUY Option ${index + 1} (${option.classification}):
+     - Entry: ${option.entryPrice} (${option.distanceInPips} pips from current)
+     - Stop Loss: ${option.stopLoss}
+     - Take Profit: ${option.takeProfit}
+     - Risk/Reward: ${option.riskReward}:1
+     - Confluence: ${option.confluence} levels
+     - Strength: ${option.strength}%
+     - Logic: ${option.reasoning.join('. ')}`
+  ).join('\n\n');
+
+  const sellOptionsText = entryPrecisionAnalysis.sellOptions.map((option, index) => 
+    `SELL Option ${index + 1} (${option.classification}):
+     - Entry: ${option.entryPrice} (${option.distanceInPips} pips from current)
+     - Stop Loss: ${option.stopLoss}
+     - Take Profit: ${option.takeProfit}
+     - Risk/Reward: ${option.riskReward}:1
+     - Confluence: ${option.confluence} levels
+     - Strength: ${option.strength}%
+     - Logic: ${option.reasoning.join('. ')}`
+  ).join('\n\n');
+
   const analysisPrompt = `
 You are an expert forex trading analyst with 15+ years of experience. Analyze ${symbol} and provide a strategic trading recommendation.
 
 ${strategyNote}
 ${multiTimeframeContext}
 
-ALGORITHMIC REFERENCE (For guidance only - make your own decisions):
+🎯 **ENTRY PRECISION ENGINE ANALYSIS** 🎯
+The Entry Precision Engine has calculated mathematically optimal entry levels based on technical confluence:
+
+**Consistency Score: ${entryPrecisionAnalysis.consistencyScore}%**
+${entryPrecisionAnalysis.consistencyScore >= 70 ? '✅ High consistency - reliable levels' : entryPrecisionAnalysis.consistencyScore >= 50 ? '⚠️ Moderate consistency - use caution' : '❌ Low consistency - high uncertainty'}
+
+**📈 BUY ENTRY OPTIONS:**
+${buyOptionsText || 'No qualified BUY entries found'}
+
+**📉 SELL ENTRY OPTIONS:**  
+${sellOptionsText || 'No qualified SELL entries found'}
+
+**🤖 ALGORITHMIC REFERENCE (Legacy - for comparison only):**
 - Suggested Strategy: ${algorithmicSuggestion.strategy}
 - Suggested Action: ${algorithmicSuggestion.action}
 - Reference Entry: ${algorithmicSuggestion.entryPrice}
 - Reference SL/TP: ${algorithmicSuggestion.stopLoss} / ${algorithmicSuggestion.takeProfit}
-- Reference R:R: ${algorithmicSuggestion.riskRewardRatio}:1
-- Algorithmic Logic: ${algorithmicSuggestion.reasoning.join('. ')}
 
-**NOTE**: These are reference suggestions only. You must analyze all technical data independently and make your own decisions on entry, stop loss, and take profit levels based on the complete technical picture provided below.
+**CRITICAL**: You MUST choose from the Entry Precision Engine options above. Do NOT create your own entry prices.
 
 ENHANCED MARKET DATA:
 **Price Action:**
@@ -117,28 +161,24 @@ ${fundBias ? `**USD FUNDAMENTALS ANALYSIS:**
   - how this influenced confidence or risk management (e.g., slight confidence reduction, preference for tighter SL/position size),
   - mention 1–2 key drivers by name.` : ''}
 
-**CRITICAL ENTRY STRATEGY RULES:**
-🚨 **CRITICAL DECISION-MAKING PRIORITY**
-🎯 **You are the primary analyst - make independent decisions based on technical analysis**
-🤖 **The algorithmic reference above is advisory only - do not simply copy its levels**
+**🎯 ENTRY PRECISION ENGINE RULES:**
+🚨 **MANDATORY ENTRY SELECTION**
+✅ **You MUST select from the Entry Precision Engine options provided above**
+❌ **Do NOT create custom entry prices - use only the calculated options**
+🔢 **All entry prices, stop losses, and take profits are pre-calculated with optimal R:R ratios**
 
-**ENTRY LEVEL SELECTION PRIORITY:**
-1. **PULLBACK ENTRIES**: Wait for retracements to key support/resistance levels
-2. **FIBONACCI RETRACEMENTS**: Use 38.2%, 50%, or 61.8% levels for strategic entries
-3. **MOVING AVERAGE TESTS**: Enter on pullbacks to SMA10, SMA20, or EMA levels
-4. **BOLLINGER BAND EXTREMES**: Enter at upper/lower bands for mean reversion
-5. **PIVOT POINT LEVELS**: Use daily pivots, S1/R1 for strategic entries
-6. **SUPPORT/RESISTANCE RETESTS**: Enter on retests of broken levels
-7. **CURRENT PRICE**: ONLY if immediate breakout momentum or no better levels available
+**ENTRY SELECTION METHODOLOGY:**
+1. **CHOOSE THE BEST OPTION**: Select the option with the highest confluence and strength
+2. **CONSIDER MARKET CONDITIONS**: Factor in session volatility and momentum
+3. **VALIDATE CONSISTENCY**: Higher consistency scores indicate more reliable setups
+4. **RESPECT RISK MANAGEMENT**: All options already comply with 1.5-2.5 R:R requirements
 
-**STOP LOSS & TAKE PROFIT RULES (R:R targeting):**
-- Anchor SL just beyond the logical invalidation level: for BUY below nearest swing low or SR zone edge; for SELL above nearest swing high or SR zone edge; add buffer ≥ 0.2×ATR.
-- Do NOT default to 50 pips. Typical SL range is 30–50 pips on majors, but smaller is allowed if protected by structure.
-- Take Profit should target R:R between 1.75 and 2.25 whenever structure allows; never exceed 2.5× risk and avoid < 1.5× unless no valid structure.
-- Prefer TP at next major S/R, pivot, or Fibonacci level (38.2/50/61.8) that fits the target range; adjust to the closest qualifying level.
-- Breakouts: SL beyond breakout with ≥ 0.2×ATR buffer; Trend/Pullbacks: SL beyond retested level.
-- Sanity: |entry − current price| ≤ 2.5×ATR unless a confirmed breakout justifies otherwise.
-- Precision: Round entry/SL/TP/support/resistance to realistic instrument precision (e.g., 5 decimals for non-JPY, 3 for JPY).
+**PRECISION ENGINE ADVANTAGES:**
+- ✅ Mathematically consistent entry levels
+- ✅ Multiple confluence confirmations  
+- ✅ Pre-validated risk/reward ratios
+- ✅ Distance-optimized for current session
+- ✅ Time-independent accuracy (same analysis = same levels)
 
 **EXPERT ANALYSIS FRAMEWORK:**
 1. **Technical Confluence:** Identify 3+ confirming signals from different indicator categories
@@ -156,28 +196,27 @@ ${fundBias ? `**USD FUNDAMENTALS ANALYSIS:**
 Respond with ONLY this JSON structure:
 {
   "action": "BUY or SELL (must choose one - HOLD not allowed)",
-  "confidence": "integer 20-95 based on technical confluence and market conditions",
-  "entry": "number - STRATEGIC entry price (prefer pullback/retracement levels over current price ${currentData.currentPrice})",
-  "stopLoss": "number - logical stop beyond key level",
-  "takeProfit": "number - target at next major S/R; aim R:R 1.75–2.25, never exceed 2.5 (min 1.5)",
+  "confidence": "integer 20-95 based on technical confluence and Entry Precision Engine consistency score",
+  "entry": "number - MUST be from Entry Precision Engine options above (DO NOT create custom price)",
+  "stopLoss": "number - use the stop loss from your selected Entry Precision Engine option",
+  "takeProfit": "number - use the take profit from your selected Entry Precision Engine option", 
   "support": "number - most critical support you identify",
   "resistance": "number - most critical resistance you identify",
-  "reasoning": "detailed explanation referencing specific technical confluences and WHY you chose this entry level",
-  "riskReward": "number - R:R in [1.5,2.5]; prefer 1.75–2.25",
-  "entryConditions": "specific trigger conditions for entry (candlestick patterns, level breaks, etc.)",
-  "entryTiming": "session-specific timing guidance and liquidity considerations",
-  "volumeConfirmation": "volume requirements and signals to confirm entry",
-  "candlestickSignals": "specific candlestick patterns to watch for confirmation"
+  "reasoning": "detailed explanation of which Entry Precision Engine option you selected and WHY based on technical analysis",
+  "riskReward": "number - use the R:R from your selected Entry Precision Engine option",
+  "selectedOption": "string - specify which option you selected (e.g., 'BUY Option 2 (PULLBACK)' or 'SELL Option 1 (STRATEGIC)')",
+  "entryConditions": "specific trigger conditions for the selected entry level",
+  "entryTiming": "session-specific timing guidance for the selected option",
+  "volumeConfirmation": "volume requirements to confirm the selected entry",
+  "candlestickSignals": "candlestick patterns to watch for at the selected entry level"
 }
 
-**CRITICAL REQUIREMENTS:**
-- **INDEPENDENT ANALYSIS**: Do not copy algorithmic reference levels - analyze the technical data yourself
-- **STRATEGIC ENTRY**: Choose pullback/retracement/technical levels based on S/R, Fibonacci, MA levels
-- **JUSTIFY ENTRY CHOICE**: Explain WHY your entry level is superior to current price (${currentData.currentPrice})
-- **R:R COMPLIANCE**: Must be within 1.5–2.5; prefer 1.75–2.25; never exceed 2.5
-- **TECHNICAL FOUNDATION**: Base SL/TP on swing levels, S/R zones, and technical structure
-- **SESSION AWARENESS**: Consider session timing and volatility in your analysis
-- **MULTI-TIMEFRAME**: Reference both 1H and 4H timeframes if using 1H+4H strategy`;
+**🎯 MANDATORY REQUIREMENTS:**
+- **USE PRECISION ENGINE OPTIONS**: Entry, SL, TP MUST match one of the options provided above
+- **SPECIFY SELECTED OPTION**: Clearly state which option you chose (e.g., "BUY Option 2 (PULLBACK)")
+- **EXPLAIN SELECTION**: Detail why this option is superior to others based on technical analysis
+- **CONSISTENCY FACTOR**: Higher consistency scores (>70%) should increase confidence
+- **NO CUSTOM PRICES**: Do not modify the pre-calculated entry, stop loss, or take profit levels`;
 
   let response;
   let aiModelUsed = '';
@@ -261,10 +300,15 @@ Respond with ONLY this JSON structure:
     if (!recommendation.action || !recommendation.confidence || !recommendation.entry) {
       throw new Error('Missing required fields in AI response');
     }
+    // Add Entry Precision Engine data to response
+    recommendation.entryPrecisionAnalysis = entryPrecisionAnalysis;
     recommendation.algorithmicStrategy = algorithmicSuggestion.strategy;
     recommendation.algorithmicPositionSize = algorithmicSuggestion.positionSize;
     recommendation.aiProvider = aiProvider;
     recommendation.aiModel = aiModelUsed || (aiProvider === 'claude' ? 'claude-opus-4-20250514' : 'gpt-5-2025-08-07');
+    
+    // Validate that the AI selected a valid entry option
+    validateEntrySelection(recommendation, entryPrecisionAnalysis);
     
 // Include fundamentals bias data if available
 if (fundBias) {
@@ -294,10 +338,51 @@ if (fundBias) {
 }
 
 console.log(`${aiProvider.toUpperCase()} analysis completed successfully`);
+console.log(`Entry Precision Analysis - Consistency: ${entryPrecisionAnalysis.consistencyScore}%, Selected: ${recommendation.selectedOption || 'Not specified'}`);
 return recommendation;
   } catch (parseError) {
     console.error(`${aiProvider.toUpperCase()} analysis parsing failed:`, parseError.message);
     console.error(`Raw ${aiProvider.toUpperCase()} Response:`, analysisText);
     throw new Error(`${aiProvider.toUpperCase()} analysis result was not valid JSON.`);
+  }
+}
+
+function validateEntrySelection(recommendation: any, entryAnalysis: any): void {
+  const selectedEntry = Number(recommendation.entry);
+  const action = String(recommendation.action).toUpperCase();
+  
+  // Find matching option from entry precision analysis
+  const relevantOptions = action === 'BUY' ? entryAnalysis.buyOptions : entryAnalysis.sellOptions;
+  const matchingOption = relevantOptions.find((option: any) => 
+    Math.abs(option.entryPrice - selectedEntry) < 0.00001
+  );
+  
+  if (!matchingOption) {
+    console.warn(`AI selected entry ${selectedEntry} not found in precision engine options. Available options:`, 
+      relevantOptions.map((opt: any) => `${opt.entryPrice} (${opt.classification})`));
+      
+    // Force selection of recommended option if available
+    const recommendedOption = action === 'BUY' ? entryAnalysis.recommendedBuyEntry : entryAnalysis.recommendedSellEntry;
+    if (recommendedOption) {
+      console.log(`Forcing selection of recommended ${action} option: ${recommendedOption.entryPrice}`);
+      recommendation.entry = recommendedOption.entryPrice;
+      recommendation.stopLoss = recommendedOption.stopLoss;
+      recommendation.takeProfit = recommendedOption.takeProfit;
+      recommendation.riskReward = recommendedOption.riskReward;
+      recommendation.selectedOption = `${action} Recommended (${recommendedOption.classification}) - Auto-corrected`;
+      
+      // Update reasoning to explain the correction
+      const originalReasoning = recommendation.reasoning || '';
+      recommendation.reasoning = `${originalReasoning}\n\nNOTE: Entry was auto-corrected to match Entry Precision Engine recommendation due to invalid selection.`;
+    }
+  } else {
+    // Ensure all related fields match the selected option
+    if (Math.abs(recommendation.stopLoss - matchingOption.stopLoss) > 0.00001 ||
+        Math.abs(recommendation.takeProfit - matchingOption.takeProfit) > 0.00001) {
+      console.log(`Correcting SL/TP to match selected entry option`);
+      recommendation.stopLoss = matchingOption.stopLoss;
+      recommendation.takeProfit = matchingOption.takeProfit;
+      recommendation.riskReward = matchingOption.riskReward;
+    }
   }
 }
