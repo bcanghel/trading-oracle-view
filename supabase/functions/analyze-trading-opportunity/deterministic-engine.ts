@@ -106,12 +106,15 @@ export function generateDeterministicSignal(
       // Build a safe, low-confidence placeholder signal instead of failing hard
       const biasLong = (features.bias4h ?? 0) >= 0 || features.ema20Slope > 0;
       const action: 'BUY' | 'SELL' = biasLong ? 'BUY' : 'SELL';
-      const atr = features.atr14 || 0.0001;
+      const atr = features.atr14 || getRealisticATR(symbol, currentPrice);
       const entry = currentPrice;
-      const stopLoss = biasLong ? entry - 0.8 * atr : entry + 0.8 * atr;
+      const minStopDistance = getMinimumStopDistance(symbol);
+      const minTakeProfitDistance = getMinimumTakeProfitDistance(symbol);
+      
+      const stopLoss = biasLong ? entry - Math.max(0.8 * atr, minStopDistance) : entry + Math.max(0.8 * atr, minStopDistance);
       const risk = Math.abs(entry - stopLoss) || 1e-6;
       const desiredRR = 1.5;
-      let takeProfit = biasLong ? entry + risk * desiredRR : entry - risk * desiredRR;
+      let takeProfit = biasLong ? entry + Math.max(risk * desiredRR, minTakeProfitDistance) : entry - Math.max(risk * desiredRR, minTakeProfitDistance);
 
       // Nearest S/R
       let support = currentPrice;
@@ -332,9 +335,9 @@ function calculateLevels(
       break;
   }
   
-  const atr = features.atr14 || 0.0001;
-  const stopDistance = atr * slMultiplier;
-  const targetDistance = atr * tpMultiplier;
+  const atr = features.atr14 || getRealisticATR(symbol, currentPrice);
+  const stopDistance = Math.max(atr * slMultiplier, getMinimumStopDistance(symbol));
+  const targetDistance = Math.max(atr * tpMultiplier, getMinimumTakeProfitDistance(symbol));
   
   const entry = currentPrice; // Market order for simplicity
   const stopLoss = isLong ? entry - stopDistance : entry + stopDistance;
@@ -434,4 +437,71 @@ function calculateSimpleRSI(data: any[], period: number): number {
   const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
   
   return 100 - (100 / (1 + rs));
+}
+
+// Helper functions for realistic pip distances
+function getRealisticATR(symbol: string, currentPrice: number): number {
+  // Provide realistic ATR fallbacks based on currency pair volatility
+  const pair = symbol.replace('/', '');
+  
+  const atrMapping: { [key: string]: number } = {
+    'GBPUSD': 0.0080,  // ~80 pips
+    'EURUSD': 0.0070,  // ~70 pips  
+    'USDCHF': 0.0065,  // ~65 pips
+    'AUDUSD': 0.0075,  // ~75 pips
+    'NZDUSD': 0.0085,  // ~85 pips
+    'EURGBP': 0.0055,  // ~55 pips
+    'EURJPY': 0.75,    // ~75 pips (JPY pair)
+    'GBPJPY': 1.20,    // ~120 pips (JPY pair)
+    'USDJPY': 0.65,    // ~65 pips (JPY pair)
+    'GBPAUD': 0.0095,  // ~95 pips
+    'EURCAD': 0.0080,  // ~80 pips
+    'USDCAD': 0.0070   // ~70 pips
+  };
+  
+  return atrMapping[pair] || (symbol.includes('JPY') ? 0.80 : 0.0075);
+}
+
+function getMinimumStopDistance(symbol: string): number {
+  // Minimum stop loss distances in price units
+  const pair = symbol.replace('/', '');
+  
+  const minStopMapping: { [key: string]: number } = {
+    'GBPUSD': 0.0025,  // 25 pips minimum
+    'EURUSD': 0.0020,  // 20 pips minimum
+    'USDCHF': 0.0020,  // 20 pips minimum
+    'AUDUSD': 0.0025,  // 25 pips minimum
+    'NZDUSD': 0.0030,  // 30 pips minimum
+    'EURGBP': 0.0015,  // 15 pips minimum
+    'EURJPY': 0.25,    // 25 pips minimum (JPY)
+    'GBPJPY': 0.35,    // 35 pips minimum (JPY)
+    'USDJPY': 0.20,    // 20 pips minimum (JPY)
+    'GBPAUD': 0.0030,  // 30 pips minimum
+    'EURCAD': 0.0025,  // 25 pips minimum
+    'USDCAD': 0.0020   // 20 pips minimum
+  };
+  
+  return minStopMapping[pair] || (symbol.includes('JPY') ? 0.25 : 0.0025);
+}
+
+function getMinimumTakeProfitDistance(symbol: string): number {
+  // Minimum take profit distances in price units (should be larger than stops)
+  const pair = symbol.replace('/', '');
+  
+  const minTPMapping: { [key: string]: number } = {
+    'GBPUSD': 0.0040,  // 40 pips minimum
+    'EURUSD': 0.0035,  // 35 pips minimum
+    'USDCHF': 0.0035,  // 35 pips minimum
+    'AUDUSD': 0.0040,  // 40 pips minimum
+    'NZDUSD': 0.0045,  // 45 pips minimum
+    'EURGBP': 0.0025,  // 25 pips minimum
+    'EURJPY': 0.40,    // 40 pips minimum (JPY)
+    'GBPJPY': 0.55,    // 55 pips minimum (JPY)
+    'USDJPY': 0.35,    // 35 pips minimum (JPY)  
+    'GBPAUD': 0.0045,  // 45 pips minimum
+    'EURCAD': 0.0040,  // 40 pips minimum
+    'USDCAD': 0.0035   // 35 pips minimum
+  };
+  
+  return minTPMapping[pair] || (symbol.includes('JPY') ? 0.40 : 0.0040);
 }

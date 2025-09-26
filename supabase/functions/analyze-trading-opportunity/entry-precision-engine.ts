@@ -55,8 +55,8 @@ export function calculateOptimalEntryLevels(
   const levels = extractBasicTechnicalLevels(safeTA, safeEnhanced, currentPrice, pipValue, atr);
   
   // Generate entry options for both directions
-  const buyOptions = generateBasicEntryOptions('BUY', levels, currentPrice, atr, pipValue);
-  const sellOptions = generateBasicEntryOptions('SELL', levels, currentPrice, atr, pipValue);
+  const buyOptions = generateBasicEntryOptions('BUY', levels, currentPrice, atr, pipValue, symbol);
+  const sellOptions = generateBasicEntryOptions('SELL', levels, currentPrice, atr, pipValue, symbol);
   
   // Find best options
   const recommendedBuyEntry = buyOptions.length > 0 ? buyOptions[0] : null;
@@ -170,15 +170,24 @@ function generateBasicEntryOptions(
   levels: TechnicalLevel[],
   currentPrice: number,
   atr: number,
-  pipValue: number
+  pipValue: number,
+  symbol: string
 ): EntryOption[] {
   const options: EntryOption[] = [];
   const isLong = direction === 'BUY';
   
-  // Immediate entry (market order)
+  // Immediate entry (market order) with proper minimum distances
   const immediateEntry = currentPrice;
-  const immediateStopLoss = isLong ? currentPrice - (atr * 0.8) : currentPrice + (atr * 0.8);
-  const immediateTakeProfit = isLong ? currentPrice + (atr * 1.6) : currentPrice - (atr * 1.6);
+  const minStopDistance = getMinimumStopDistance(symbol);
+  const minTakeProfitDistance = getMinimumTakeProfitDistance(symbol);
+  
+  const immediateStopLoss = isLong ? 
+    currentPrice - Math.max(atr * 0.8, minStopDistance) : 
+    currentPrice + Math.max(atr * 0.8, minStopDistance);
+    
+  const immediateTakeProfit = isLong ? 
+    currentPrice + Math.max(atr * 1.6, minTakeProfitDistance) : 
+    currentPrice - Math.max(atr * 1.6, minTakeProfitDistance);
   
   options.push({
     classification: 'IMMEDIATE',
@@ -205,8 +214,16 @@ function generateBasicEntryOptions(
                          level.distanceFromCurrent <= 30 ? 'STRATEGIC' : 'EXTREME';
     
     const entryPrice = level.price;
-    const stopLoss = isLong ? entryPrice - (atr * 0.6) : entryPrice + (atr * 0.6);
-    const takeProfit = isLong ? entryPrice + (atr * 1.5) : entryPrice - (atr * 1.5);
+    const minStopDistance = getMinimumStopDistance(symbol);
+    const minTakeProfitDistance = getMinimumTakeProfitDistance(symbol);
+    
+    const stopLoss = isLong ? 
+      entryPrice - Math.max(atr * 0.6, minStopDistance) : 
+      entryPrice + Math.max(atr * 0.6, minStopDistance);
+      
+    const takeProfit = isLong ? 
+      entryPrice + Math.max(atr * 1.5, minTakeProfitDistance) : 
+      entryPrice - Math.max(atr * 1.5, minTakeProfitDistance);
     
     options.push({
       classification,
@@ -246,4 +263,25 @@ function calculateBasicConsistencyScore(
   score += Math.min(20, highStrengthLevels * 5);
   
   return Math.min(100, Math.max(20, Math.round(score)));
+}
+
+// Helper functions for realistic pip distances (same as deterministic engine)
+function getMinimumStopDistance(symbol: string): number {
+  const pair = symbol.replace('/', '');
+  const minStopMapping: { [key: string]: number } = {
+    'GBPUSD': 0.0025, 'EURUSD': 0.0020, 'USDCHF': 0.0020, 'AUDUSD': 0.0025,
+    'NZDUSD': 0.0030, 'EURGBP': 0.0015, 'EURJPY': 0.25, 'GBPJPY': 0.35,
+    'USDJPY': 0.20, 'GBPAUD': 0.0030, 'EURCAD': 0.0025, 'USDCAD': 0.0020
+  };
+  return minStopMapping[pair] || (symbol.includes('JPY') ? 0.25 : 0.0025);
+}
+
+function getMinimumTakeProfitDistance(symbol: string): number {
+  const pair = symbol.replace('/', '');
+  const minTPMapping: { [key: string]: number } = {
+    'GBPUSD': 0.0040, 'EURUSD': 0.0035, 'USDCHF': 0.0035, 'AUDUSD': 0.0040,
+    'NZDUSD': 0.0045, 'EURGBP': 0.0025, 'EURJPY': 0.40, 'GBPJPY': 0.55,
+    'USDJPY': 0.35, 'GBPAUD': 0.0045, 'EURCAD': 0.0040, 'USDCAD': 0.0035
+  };
+  return minTPMapping[pair] || (symbol.includes('JPY') ? 0.40 : 0.0040);
 }

@@ -193,7 +193,7 @@ serve(async (req) => {
           baseTA,
           enhancedFeatures,
           sessionContext || {},
-          enhancedFeatures.atr14 || enhancedFeatures.atr20 || 0.0001
+          enhancedFeatures.atr14 || enhancedFeatures.atr20 || 0.0075 // Reasonable fallback
         );
         recommendation.entryPrecisionAnalysis = precisionAnalysis;
       }
