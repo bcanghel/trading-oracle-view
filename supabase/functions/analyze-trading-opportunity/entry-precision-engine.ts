@@ -47,12 +47,19 @@ export function calculateOptimalEntryLevels(
   
   const pipValue = symbol.includes('JPY') ? 0.01 : 0.0001;
   
-  // Safe defaults for missing data
-  const safeTA = technicalAnalysis || {};
-  const safeEnhanced = enhancedFeatures || {};
+  // Validate required data - no fallbacks
+  if (!technicalAnalysis) {
+    throw new Error('Technical analysis data is required');
+  }
+  if (!enhancedFeatures) {
+    throw new Error('Enhanced features data is required');
+  }
+  if (!atr || atr <= 0) {
+    throw new Error(`ATR data not available for ${symbol}`);
+  }
   
   // Extract basic technical levels
-  const levels = extractBasicTechnicalLevels(safeTA, safeEnhanced, currentPrice, pipValue, atr);
+  const levels = extractBasicTechnicalLevels(technicalAnalysis, enhancedFeatures, currentPrice, pipValue, atr);
   
   // Generate entry options for both directions
   const buyOptions = generateBasicEntryOptions('BUY', levels, currentPrice, atr, pipValue, symbol);
@@ -88,41 +95,34 @@ function extractBasicTechnicalLevels(
 ): TechnicalLevel[] {
   const levels: TechnicalLevel[] = [];
   
-  // EMA levels (with null checks)
-  if (enhanced.ema20) {
-    levels.push(createLevel(enhanced.ema20, 'EMA', 'EMA20', currentPrice, pipValue, 75));
+  // EMA levels - require actual data
+  if (!enhanced.ema20 || !enhanced.ema50) {
+    throw new Error('EMA20 and EMA50 data are required');
   }
-  if (enhanced.ema50) {
-    levels.push(createLevel(enhanced.ema50, 'EMA', 'EMA50', currentPrice, pipValue, 80));
+  levels.push(createLevel(enhanced.ema20, 'EMA', 'EMA20', currentPrice, pipValue, 75));
+  levels.push(createLevel(enhanced.ema50, 'EMA', 'EMA50', currentPrice, pipValue, 80));
+  
+  // SMA levels - require actual data
+  if (!ta.sma10 || !ta.sma20) {
+    throw new Error('SMA10 and SMA20 data are required');
   }
+  levels.push(createLevel(ta.sma10, 'SMA', 'SMA10', currentPrice, pipValue, 70));
+  levels.push(createLevel(ta.sma20, 'SMA', 'SMA20', currentPrice, pipValue, 75));
   
-  // SMA levels
-  if (ta.sma10) {
-    levels.push(createLevel(ta.sma10, 'SMA', 'SMA10', currentPrice, pipValue, 70));
+  // Support and Resistance - require actual data
+  if (!ta.support || !ta.resistance) {
+    throw new Error('Support and resistance levels are required');
   }
-  if (ta.sma20) {
-    levels.push(createLevel(ta.sma20, 'SMA', 'SMA20', currentPrice, pipValue, 75));
+  levels.push(createLevel(ta.support, 'SUPPORT', 'Key Support', currentPrice, pipValue, 90));
+  levels.push(createLevel(ta.resistance, 'RESISTANCE', 'Key Resistance', currentPrice, pipValue, 90));
+  
+  // Bollinger Bands - require actual data
+  if (!ta.bollinger?.upper || !ta.bollinger?.middle || !ta.bollinger?.lower) {
+    throw new Error('Complete Bollinger Bands data is required');
   }
-  
-  // Support and Resistance (always include fallback levels)
-  const support = ta.support || currentPrice - (atr * 1.5);
-  const resistance = ta.resistance || currentPrice + (atr * 1.5);
-  
-  levels.push(createLevel(support, 'SUPPORT', 'Key Support', currentPrice, pipValue, 90));
-  levels.push(createLevel(resistance, 'RESISTANCE', 'Key Resistance', currentPrice, pipValue, 90));
-  
-  // Bollinger Bands
-  if (ta.bollinger) {
-    if (ta.bollinger.upper) levels.push(createLevel(ta.bollinger.upper, 'BOLLINGER', 'Upper Band', currentPrice, pipValue, 70));
-    if (ta.bollinger.middle) levels.push(createLevel(ta.bollinger.middle, 'BOLLINGER', 'Middle Band', currentPrice, pipValue, 75));
-    if (ta.bollinger.lower) levels.push(createLevel(ta.bollinger.lower, 'BOLLINGER', 'Lower Band', currentPrice, pipValue, 70));
-  }
-  
-  // Session levels
-  const sessionHigh = currentPrice + (atr * 1.2);
-  const sessionLow = currentPrice - (atr * 1.2);
-  levels.push(createLevel(sessionHigh, 'SESSION_LEVEL', 'Session High', currentPrice, pipValue, 60));
-  levels.push(createLevel(sessionLow, 'SESSION_LEVEL', 'Session Low', currentPrice, pipValue, 60));
+  levels.push(createLevel(ta.bollinger.upper, 'BOLLINGER', 'Upper Band', currentPrice, pipValue, 70));
+  levels.push(createLevel(ta.bollinger.middle, 'BOLLINGER', 'Middle Band', currentPrice, pipValue, 75));
+  levels.push(createLevel(ta.bollinger.lower, 'BOLLINGER', 'Lower Band', currentPrice, pipValue, 70));
   
   // Calculate confluence
   calculateConfluence(levels, pipValue * 5);

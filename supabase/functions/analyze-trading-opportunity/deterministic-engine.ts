@@ -28,6 +28,17 @@ export function generateDeterministicSignal(
   currentPrice: number
 ): DeterministicAnalysis | null {
   
+  // Validate required data - no fallbacks allowed
+  if (!features) {
+    throw new Error('Enhanced features data is required');
+  }
+  if (!features.atr14 && !features.atr20) {
+    throw new Error(`ATR data not available for ${symbol}`);
+  }
+  if (!features.srZones || features.srZones.length === 0) {
+    throw new Error('Support/Resistance zones data is required');
+  }
+  
   // === HARD PRE-GATES ===
   const reasoning: string[] = [];
   let gated = false; // if any gate triggers, we still produce a safe low-confidence signal
@@ -106,7 +117,11 @@ export function generateDeterministicSignal(
       // Build a safe, low-confidence placeholder signal instead of failing hard
       const biasLong = (features.bias4h ?? 0) >= 0 || features.ema20Slope > 0;
       const action: 'BUY' | 'SELL' = biasLong ? 'BUY' : 'SELL';
-      const atr = features.atr14 || getRealisticATR(symbol, currentPrice);
+      // Require actual ATR data - no fallbacks
+      if (!features.atr14 && !features.atr20) {
+        throw new Error(`ATR data not available for ${symbol} - cannot generate fallback signal`);
+      }
+      const atr = features.atr14 || features.atr20;
       const entry = currentPrice;
       const minStopDistance = getMinimumStopDistance(symbol);
       const minTakeProfitDistance = getMinimumTakeProfitDistance(symbol);
@@ -335,7 +350,10 @@ function calculateLevels(
       break;
   }
   
-  const atr = features.atr14 || getRealisticATR(symbol, currentPrice);
+  const atr = features.atr14 || features.atr20;
+  if (!atr) {
+    throw new Error(`ATR data not available for ${symbol}`);
+  }
   const stopDistance = Math.max(atr * slMultiplier, getMinimumStopDistance(symbol));
   const targetDistance = Math.max(atr * tpMultiplier, getMinimumTakeProfitDistance(symbol));
   
@@ -439,29 +457,7 @@ function calculateSimpleRSI(data: any[], period: number): number {
   return 100 - (100 / (1 + rs));
 }
 
-// Helper functions for realistic pip distances
-function getRealisticATR(symbol: string, currentPrice: number): number {
-  // Provide realistic ATR fallbacks based on currency pair volatility
-  const pair = symbol.replace('/', '');
-  
-  const atrMapping: { [key: string]: number } = {
-    'GBPUSD': 0.0080,  // ~80 pips
-    'EURUSD': 0.0070,  // ~70 pips  
-    'USDCHF': 0.0065,  // ~65 pips
-    'AUDUSD': 0.0075,  // ~75 pips
-    'NZDUSD': 0.0085,  // ~85 pips
-    'EURGBP': 0.0055,  // ~55 pips
-    'EURJPY': 0.75,    // ~75 pips (JPY pair)
-    'GBPJPY': 1.20,    // ~120 pips (JPY pair)
-    'USDJPY': 0.65,    // ~65 pips (JPY pair)
-    'GBPAUD': 0.0095,  // ~95 pips
-    'EURCAD': 0.0080,  // ~80 pips
-    'USDCAD': 0.0070   // ~70 pips
-  };
-  
-  return atrMapping[pair] || (symbol.includes('JPY') ? 0.80 : 0.0075);
-}
-
+// Helper functions for minimum distances only - no fallback ATR data
 function getMinimumStopDistance(symbol: string): number {
   // Minimum stop loss distances in price units
   const pair = symbol.replace('/', '');

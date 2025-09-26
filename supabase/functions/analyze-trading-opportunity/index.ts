@@ -193,8 +193,12 @@ serve(async (req) => {
           baseTA,
           enhancedFeatures,
           sessionContext || {},
-          enhancedFeatures.atr14 || enhancedFeatures.atr20 || 0.0075 // Reasonable fallback
+          enhancedFeatures.atr14 || enhancedFeatures.atr20
         );
+        
+        if (!enhancedFeatures.atr14 && !enhancedFeatures.atr20) {
+          throw new Error(`ATR data not available for entry precision analysis`);
+        }
         recommendation.entryPrecisionAnalysis = precisionAnalysis;
       }
     } catch (precisionError) {

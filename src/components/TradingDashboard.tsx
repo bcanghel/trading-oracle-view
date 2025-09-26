@@ -455,7 +455,19 @@ export function TradingDashboard() {
          { useDeterministic: aiProvider === 'deterministic', historical1dData: data.historical1dData, aiProvider: aiProvider !== 'deterministic' ? aiProvider : undefined }
       );
 
-      // Check if analysis failed
+      // Check if analysis failed or has errors
+      if (!analysis.success) {
+        setRecommendation(null);
+        setConfidenceScoring(null);
+        setAnalysisInputData(null);
+        toast({
+          title: "Analysis Failed",
+          description: analysis.error || "Analysis failed due to missing required data. Real market data is needed.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (analysis.aiError) {
         setRecommendation(null);
         setConfidenceScoring(null);
