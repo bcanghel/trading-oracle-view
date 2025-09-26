@@ -1305,11 +1305,11 @@ export function TradingDashboard() {
                       <p className="text-sm font-medium text-muted-foreground">Entry Precision Engine</p>
                       <Badge 
                         variant={
-                          recommendation.entryPrecisionAnalysis.consistencyScore >= 70 ? "default" : 
-                          recommendation.entryPrecisionAnalysis.consistencyScore >= 50 ? "secondary" : "outline"
+                          (recommendation.entryPrecisionAnalysis.consistencyScore || 0) >= 70 ? "default" : 
+                          (recommendation.entryPrecisionAnalysis.consistencyScore || 0) >= 50 ? "secondary" : "outline"
                         }
                       >
-                        {recommendation.entryPrecisionAnalysis.consistencyScore}% Consistency
+                        {recommendation.entryPrecisionAnalysis.consistencyScore || 0}% Consistency
                       </Badge>
                     </div>
                     
@@ -1331,13 +1331,13 @@ export function TradingDashboard() {
                         </div>
                       </div>
                       
-                      {recommendation.entryPrecisionAnalysis.consistencyScore >= 70 && (
+                      {(recommendation.entryPrecisionAnalysis.consistencyScore || 0) >= 70 && (
                         <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
                           <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
                           High precision - mathematically consistent levels
                         </div>
                       )}
-                      {recommendation.entryPrecisionAnalysis.consistencyScore < 50 && (
+                      {(recommendation.entryPrecisionAnalysis.consistencyScore || 0) < 50 && (
                         <div className="mt-2 flex items-center gap-1 text-xs text-yellow-600">
                           <AlertTriangle className="h-3 w-3" />
                           Lower precision - increased uncertainty

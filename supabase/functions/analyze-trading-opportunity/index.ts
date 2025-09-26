@@ -39,9 +39,10 @@ serve(async (req) => {
     const { generateDeterministicSignal } = await import('./deterministic-engine.ts');
     
     if (useDeterministic || (!Deno.env.get('OPEN_AI_API') && !Deno.env.get('ANTHROPIC_API'))) {
+      // Fix parameter mismatch - deterministic engine expects different signature
       recommendation = generateDeterministicSignal(
         symbol,
-        { historicalData, currentData, historical4hData },
+        currentData,
         enhancedFeatures,
         sessionContext,
         currentPrice
@@ -83,7 +84,7 @@ serve(async (req) => {
         
         recommendation = generateDeterministicSignal(
           symbol,
-          { historicalData, currentData, historical4hData },
+          currentData,
           enhancedFeatures,
           sessionContext,
           currentPrice
@@ -178,6 +179,20 @@ serve(async (req) => {
       };
     } catch (scErr) {
       console.error('Confidence scoring error:', scErr);
+    }
+
+    // Add Entry Precision Analysis to recommendation if not already present
+    if (!recommendation.entryPrecisionAnalysis) {
+      const { calculateOptimalEntryLevels } = await import('./entry-precision-engine.ts');
+      const precisionAnalysis = calculateOptimalEntryLevels(
+        symbol,
+        currentPrice,
+        { ...calculateTechnicalIndicators(historicalData), enhancedFeatures },
+        enhancedFeatures,
+        sessionContext,
+        enhancedFeatures.atr14 || 0.0001
+      );
+      recommendation.entryPrecisionAnalysis = precisionAnalysis;
     }
 
     // Include fundamentals analysis in response if available
