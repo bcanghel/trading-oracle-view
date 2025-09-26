@@ -313,7 +313,7 @@ function calculateLevels(
   symbol: string
 ) {
   const isLong = direction === 'LONG';
-  const action = isLong ? 'BUY' : 'SELL';
+  const action: 'BUY' | 'SELL' = isLong ? 'BUY' : 'SELL';
   
   // ATR-based stops and targets
   let slMultiplier = 0.8; // Default

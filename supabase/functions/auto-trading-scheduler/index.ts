@@ -515,7 +515,7 @@ serve(async (req) => {
           entry: analysis.entry,
           currentPrice: marketData.currentData.currentPrice,
           entryType: analysis.entry === marketData.currentData.currentPrice ? 'MARKET' : 'LIMIT',
-          riskReward: analysis.riskReward
+          riskReward: 'riskReward' in analysis ? analysis.riskReward : 0
         } : 'null');
         
         // Only create trades if AI analysis succeeds
@@ -984,7 +984,7 @@ serve(async (req) => {
     console.error('Error in auto-trading scheduler:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString()
       }),
       { 

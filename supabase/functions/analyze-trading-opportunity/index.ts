@@ -80,7 +80,7 @@ serve(async (req) => {
           aiProvider
         );
       } catch (aiError) {
-        console.log('AI analysis failed, using deterministic fallback:', aiError.message);
+        console.log('AI analysis failed, using deterministic fallback:', aiError instanceof Error ? aiError.message : String(aiError));
         
         recommendation = generateDeterministicSignal(
           symbol,
@@ -182,17 +182,24 @@ serve(async (req) => {
     }
 
     // Add Entry Precision Analysis to recommendation if not already present
-    if (!recommendation.entryPrecisionAnalysis) {
-      const { calculateOptimalEntryLevels } = await import('./entry-precision-engine.ts');
-      const precisionAnalysis = calculateOptimalEntryLevels(
-        symbol,
-        currentPrice,
-        { ...calculateTechnicalIndicators(historicalData), enhancedFeatures },
-        enhancedFeatures,
-        sessionContext,
-        enhancedFeatures.atr14 || 0.0001
-      );
-      recommendation.entryPrecisionAnalysis = precisionAnalysis;
+    try {
+      if (!recommendation.entryPrecisionAnalysis) {
+        const { calculateOptimalEntryLevels } = await import('./entry-precision-engine.ts');
+        const baseTA = calculateTechnicalIndicators(historicalData);
+        
+        const precisionAnalysis = calculateOptimalEntryLevels(
+          symbol,
+          currentPrice,
+          baseTA,
+          enhancedFeatures,
+          sessionContext || {},
+          enhancedFeatures.atr14 || enhancedFeatures.atr20 || 0.0001
+        );
+        recommendation.entryPrecisionAnalysis = precisionAnalysis;
+      }
+    } catch (precisionError) {
+      console.warn('Entry precision analysis failed:', precisionError instanceof Error ? precisionError.message : String(precisionError));
+      // Continue without precision analysis - don't break the main flow
     }
 
     // Include fundamentals analysis in response if available
@@ -227,7 +234,7 @@ serve(async (req) => {
     console.error('Error in analyze-trading-opportunity function:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         success: false,
       }),
       {

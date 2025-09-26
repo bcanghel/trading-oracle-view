@@ -341,7 +341,7 @@ console.log(`${aiProvider.toUpperCase()} analysis completed successfully`);
 console.log(`Entry Precision Analysis - Consistency: ${entryPrecisionAnalysis.consistencyScore}%, Selected: ${recommendation.selectedOption || 'Not specified'}`);
 return recommendation;
   } catch (parseError) {
-    console.error(`${aiProvider.toUpperCase()} analysis parsing failed:`, parseError.message);
+    console.error(`${aiProvider.toUpperCase()} analysis parsing failed:`, parseError instanceof Error ? parseError.message : String(parseError));
     console.error(`Raw ${aiProvider.toUpperCase()} Response:`, analysisText);
     throw new Error(`${aiProvider.toUpperCase()} analysis result was not valid JSON.`);
   }

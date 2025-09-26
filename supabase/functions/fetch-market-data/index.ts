@@ -125,7 +125,7 @@ serve(async (req) => {
           }
         }
       } catch (err) {
-        console.log(`Symbol format ${testSymbol} failed: ${err.message}`);
+        console.log(`Symbol format ${testSymbol} failed: ${err instanceof Error ? err.message : String(err)}`);
         continue;
       }
     }
@@ -385,7 +385,7 @@ serve(async (req) => {
     console.error('Error in fetch-market-data function:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         success: false,
       }),
       {

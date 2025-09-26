@@ -69,8 +69,8 @@ function determineStrategy(conditions: MarketConditions): string {
     let bestStrategy = 'HOLD';
     let maxScore = 50; // Set a minimum threshold to act
     for (const strategy in scores) {
-        if (scores[strategy] > maxScore) {
-            maxScore = scores[strategy];
+        if (scores[strategy as keyof typeof scores] > maxScore) {
+            maxScore = scores[strategy as keyof typeof scores];
             bestStrategy = strategy;
         }
     }
